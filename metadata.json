@@ -1,0 +1,6 @@
+{
+  "name": "NEXORA AI",
+  "description": "Premium AI Video Production Studio for Business Documentaries, Islamic Reels, Urdu Voice Generation, and Video Editing.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
