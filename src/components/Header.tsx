@@ -24,6 +24,10 @@ const TAB_TITLES: Record<TabType, { title: string; subtitle: string }> = {
     title: 'Command Dashboard',
     subtitle: 'Real-time metrics, quick AI workflows & project library',
   },
+  complete_video_maker: {
+    title: 'Complete Video Maker Studio',
+    subtitle: '12-Step automated AI pipeline from topic to final MP4 video',
+  },
   business_documentary: {
     title: 'Business Documentary Studio',
     subtitle: 'Research, Urdu narration, scene division & Pexels footage',
@@ -32,17 +36,45 @@ const TAB_TITLES: Record<TabType, { title: string; subtitle: string }> = {
     title: 'Islamic Reels Studio (9:16)',
     subtitle: 'Strict authentic citations, Urdu Nastaliq subtitles & spiritual visuals',
   },
+  hook_designer: {
+    title: 'Advanced Hook Designer Studio',
+    subtitle: '10 unique high-retention hook formulas with voice pacing & SFX',
+  },
   script_writer: {
     title: 'AI Script Laboratory',
     subtitle: 'Multi-format Urdu & English narrative scripts with timings',
   },
+  script_improver: {
+    title: 'Script Improver & Retention Analyzer',
+    subtitle: 'Retention curve analytics, drop-off fixes & Urdu vocabulary polish',
+  },
+  video_link_analyzer: {
+    title: 'Video Link Analyzer Studio',
+    subtitle: 'Analyze YouTube, Reels & TikTok structure, pacing & style inspiration',
+  },
   urdu_voice: {
-    title: 'Urdu Voice Generator & Recorder',
-    subtitle: 'Natural speech synthesis, pitch controls & microphone recording studio',
+    title: 'Multi-Language Voice Generator Studio',
+    subtitle: 'Audible TTS for Urdu, English, Roman Urdu, Arabic & Hindi with pitch and speed',
+  },
+  voice_recorder: {
+    title: 'Voice Studio & Microphone Recorder',
+    subtitle: 'Record narration with live audio frequency visualizer & instant WAV export',
+  },
+  music_studio: {
+    title: 'Background Music Studio',
+    subtitle: '8 genuine royalty-free mood tracks with auto-speech ducking and WAV export',
+  },
+  sfx_studio: {
+    title: 'Sound Effects & Transitions Studio',
+    subtitle: 'Synthesized cinematic whooshes, impacts, risers & interface cues',
   },
   video_editor: {
     title: 'Video Editor & Media Studio',
-    subtitle: 'Timeline, scene arrangement, Urdu captions & real MP4/WebM render',
+    subtitle: 'Multi-track timeline, scene split/trim/duplicate & verified audio export',
+  },
+  subtitle_studio: {
+    title: 'Subtitle & Caption Studio',
+    subtitle: 'Auto-chunking captions with Nastaliq RTL typography & SRT/VTT downloads',
   },
   thumbnail_generator: {
     title: 'YouTube & Reel Thumbnail Studio',

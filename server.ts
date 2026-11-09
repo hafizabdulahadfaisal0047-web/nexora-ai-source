@@ -538,7 +538,13 @@ Generate a data-backed YouTube SEO optimization report formatted strictly as JSO
 
 // 5. Gemini Text-To-Speech (TTS) Endpoint
 app.post('/api/gemini/tts', async (req, res) => {
-  const { text, voiceName = 'Kore', style = 'Clear, professional Urdu narrator, slow and authoritative' } = req.body;
+  const {
+    text,
+    voiceName = 'Kore',
+    language = 'urdu',
+    speed = 1.0,
+    style,
+  } = req.body;
 
   if (!text || !text.trim()) {
     return res.status(400).json({ error: 'Text is required for TTS' });
@@ -552,6 +558,22 @@ app.post('/api/gemini/tts', async (req, res) => {
     });
   }
 
+  // Dynamic voice styling based on language
+  let computedStyle = style;
+  if (!computedStyle) {
+    if (language === 'urdu') {
+      computedStyle = 'Clear, authoritative Urdu documentary narrator, slow and rhythmic cadence';
+    } else if (language === 'arabic') {
+      computedStyle = 'Eloquent classical Arabic narrator, resonant and clear articulation';
+    } else if (language === 'hindi') {
+      computedStyle = 'Engaging, expressive Hindi documentary narrator';
+    } else if (language === 'roman_urdu') {
+      computedStyle = 'Conversational, modern South Asian podcast narrator';
+    } else {
+      computedStyle = 'Cinematic, compelling documentary narrator with clear pronunciation';
+    }
+  }
+
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3.8-flash-lite-tts',
@@ -562,7 +584,7 @@ app.post('/api/gemini/tts', async (req, res) => {
             {
               text: text.trim(),
               speechMetadata: {
-                style,
+                style: computedStyle,
               },
             },
           ],
@@ -592,6 +614,416 @@ app.post('/api/gemini/tts', async (req, res) => {
   } catch (error: any) {
     console.warn('Gemini TTS warning, falling back to local audio synthesis:', error.message);
     return res.json({ success: false, isFallback: true, error: error.message });
+  }
+});
+
+// 6. Advanced Hook Designer Endpoint (10 Unique Hook Varieties)
+app.post('/api/gemini/hooks', async (req, res) => {
+  const {
+    topic,
+    targetAudience = 'General viewers',
+    platform = 'YouTube Long',
+    primaryLanguage = 'urdu',
+    videoDuration = '3-5 minutes',
+    tone = 'Curiosity and High Stakes',
+  } = req.body;
+
+  if (!topic || !topic.trim()) {
+    return res.status(400).json({ error: 'Topic is required for Hook Designer' });
+  }
+
+  const languagePrompt =
+    primaryLanguage === 'urdu'
+      ? 'CRITICAL: Write ALL opening lines and onScreenText strictly in fluent, authentic, literary Urdu (Nastaliq script). Never mix English words unless technical terms.'
+      : primaryLanguage === 'arabic'
+      ? 'CRITICAL: Write ALL opening lines and onScreenText strictly in eloquent, grammatically correct Arabic.'
+      : primaryLanguage === 'hindi'
+      ? 'CRITICAL: Write ALL opening lines and onScreenText in natural Hindi script (Devanagari).'
+      : primaryLanguage === 'roman_urdu'
+      ? 'CRITICAL: Write ALL opening lines in Roman Urdu (English alphabet).'
+      : 'CRITICAL: Write ALL opening lines strictly in high-retention English.';
+
+  const prompt = `You are the master retention engineer and viral hook director for NEXORA AI.
+Topic: "${topic}"
+Target Audience: ${targetAudience}
+Platform: ${platform}
+Language: ${primaryLanguage}
+Video Duration: ${videoDuration}
+Tone: ${tone}
+
+${languagePrompt}
+
+Generate 10 completely UNIQUE, non-generic, high-converting hooks. Each hook MUST have a distinct psychological mechanism:
+1. Curiosity (Gap in knowledge)
+2. Emotional (Direct empathy or stakes)
+3. Documentary (Authoritative cinematic reveal)
+4. Question (Thought-provoking dilemma)
+5. Shocking Stat (Eye-opening data point)
+6. Contrast / Paradox (Two conflicting truths)
+7. Story / Anecdote (In medias res opening)
+8. Challenge / Direct (Calling out the viewer directly)
+9. Visual Hook (Opening with a striking visual action)
+10. Urgency (Why this matters right now in 2026)
+
+Return strictly JSON matching this structure:
+{
+  "topic": string,
+  "targetAudience": string,
+  "platform": string,
+  "primaryLanguage": string,
+  "videoDuration": string,
+  "tone": string,
+  "hooks": [
+    {
+      "id": string,
+      "hookType": "Curiosity" | "Emotional" | "Documentary" | "Question" | "Shocking Stat" | "Contrast / Paradox" | "Story / Anecdote" | "Challenge / Direct" | "Visual Hook" | "Urgency",
+      "openingLine": string,
+      "first3SecondsAction": string,
+      "suggestedFootage": string,
+      "voicePacingStyle": string,
+      "soundEffectCue": "Cinematic Sub Boom" | "Air Whip Whoosh" | "Suspense Riser" | "Sub-Bass Drop" | "Vinyl Scratch",
+      "onScreenText": string
+    }
+  ]
+}`;
+
+  if (!ai) {
+    return res.json({
+      success: true,
+      data: generateFallbackHooks(topic, primaryLanguage, platform),
+      isFallback: true,
+    });
+  }
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.8-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+      },
+    });
+
+    const parsed = JSON.parse(response.text || '{}');
+    return res.json({ success: true, data: parsed, isFallback: false });
+  } catch (err: any) {
+    console.warn('Hook generation error, using fallback:', err.message);
+    return res.json({
+      success: true,
+      data: generateFallbackHooks(topic, primaryLanguage, platform),
+      isFallback: true,
+    });
+  }
+});
+
+// 7. Script Improver Studio Endpoint
+app.post('/api/gemini/script-improve', async (req, res) => {
+  const {
+    originalText,
+    primaryLanguage = 'urdu',
+    goal = 'retention', // 'retention' | 'pacing' | 'vocabulary' | 'concise' | 'expand'
+    targetPacing = 'Fast and engaging',
+  } = req.body;
+
+  if (!originalText || !originalText.trim()) {
+    return res.status(400).json({ error: 'Original text is required for Script Improver' });
+  }
+
+  const prompt = `You are a legendary script doctor and retention editor for YouTube documentaries and reels.
+Original Script:
+"""${originalText}"""
+
+Primary Language: ${primaryLanguage}
+Goal: ${goal}
+Target Pacing: ${targetPacing}
+
+Analyze this script with zero slop. Strictly preserve the primary language (${primaryLanguage}).
+Rewrite and elevate it to world-class retention standards:
+1. Strengthen opening hook.
+2. Cut filler, fluff, and dragging explanations.
+3. Enhance vocabulary and rhetorical impact.
+4. Add clear vocal cues and visual cues.
+
+Return strictly JSON:
+{
+  "originalText": string,
+  "improvedText": string,
+  "primaryLanguage": string,
+  "changesMade": [string],
+  "metrics": {
+    "pacingScore": number (1-100),
+    "vocabularyScore": number (1-100),
+    "hookStrengthScore": number (1-100),
+    "clarityScore": number (1-100)
+  },
+  "retentionBoosters": [string],
+  "cutSuggestions": [string]
+}`;
+
+  if (!ai) {
+    return res.json({
+      success: true,
+      data: {
+        originalText,
+        improvedText: originalText,
+        primaryLanguage,
+        changesMade: ['Polished sentence cadence', 'Enhanced hook punchiness', 'Removed passive phrasing'],
+        metrics: { pacingScore: 92, vocabularyScore: 90, hookStrengthScore: 94, clarityScore: 95 },
+        retentionBoosters: ['Add sound effect hit on keyword', 'Insert question before revelation'],
+        cutSuggestions: ['Trim introductory filler phrases'],
+      },
+      isFallback: true,
+    });
+  }
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.8-flash',
+      contents: prompt,
+      config: { responseMimeType: 'application/json' },
+    });
+    const parsed = JSON.parse(response.text || '{}');
+    return res.json({ success: true, data: parsed, isFallback: false });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// 8. Video Link Analyzer Endpoint
+app.post('/api/gemini/link-analyze', async (req, res) => {
+  const { url } = req.body;
+
+  if (!url || !url.trim()) {
+    return res.status(400).json({ error: 'URL is required for Link Analyzer' });
+  }
+
+  let platform: 'YouTube' | 'Instagram' | 'TikTok' | 'Unknown' = 'Unknown';
+  if (url.includes('youtube.com') || url.includes('youtu.be')) platform = 'YouTube';
+  else if (url.includes('instagram.com')) platform = 'Instagram';
+  else if (url.includes('tiktok.com')) platform = 'TikTok';
+
+  const prompt = `You are a senior video strategist and algorithmic analyst for NEXORA AI.
+Analyze the following public video link reference:
+URL: "${url}"
+Detected Platform: ${platform}
+
+Analyze the topic, viral structure, and narrative formula of this video format:
+- Deconstruct the 5-part storytelling arc (Hook, Problem, Escalation, Climax, Resolution).
+- Analyze the estimated pacing, cuts per minute, B-roll density, and music mood.
+- Dissect the hook anatomy: Why does the first 3-5 seconds capture attention?
+- Formulate 3 distinct actionable pathways for the creator:
+  1. An original script idea covering the same overarching topic without copying.
+  2. Editing style guidelines inspired by the pacing.
+  3. Tips if the user wants to film their own version with user-owned footage.
+
+IMPORTANT COMPLIANCE:
+Never promise copyrighted video downloading. Emphasize that all creator productions in NEXORA AI use licensed stock or user-owned media.
+
+Return strictly JSON:
+{
+  "url": string,
+  "platform": "${platform}",
+  "topic": string,
+  "niche": string,
+  "estimatedDuration": string,
+  "storyStructure": {
+    "hook": string,
+    "problem": string,
+    "escalation": string,
+    "climax": string,
+    "resolution": string
+  },
+  "transcriptSummary": string,
+  "keyTakeaways": [string],
+  "editingStyle": {
+    "pacing": string,
+    "cutsPerMinute": string,
+    "bRollDensity": string,
+    "colorGradeVibe": string,
+    "musicVibe": string
+  },
+  "hookAnatomy": {
+    "openingLine": string,
+    "retentionDriver": string,
+    "visualTrigger": string
+  },
+  "visualStyle": string,
+  "actionSuggestions": {
+    "originalScriptTopic": string,
+    "styleInspirationNotes": string,
+    "userUploadTips": string
+  }
+}`;
+
+  if (!ai) {
+    return res.json({
+      success: true,
+      data: generateFallbackLinkAnalysis(url, platform),
+      isFallback: true,
+    });
+  }
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.8-flash',
+      contents: prompt,
+      config: { responseMimeType: 'application/json' },
+    });
+    const parsed = JSON.parse(response.text || '{}');
+    return res.json({ success: true, data: parsed, isFallback: false });
+  } catch (err: any) {
+    return res.json({
+      success: true,
+      data: generateFallbackLinkAnalysis(url, platform),
+      isFallback: true,
+    });
+  }
+});
+
+// 9. Viral Content & Retention Analyzer Endpoint
+app.post('/api/gemini/retention', async (req, res) => {
+  const { contentText, platform = 'YouTube Long', durationSeconds = 180 } = req.body;
+
+  if (!contentText) {
+    return res.status(400).json({ error: 'Content text or script is required for retention analysis' });
+  }
+
+  const prompt = `You are the lead audience retention auditor for top creators.
+Analyze the following video content/script for audience drop-off risks and viral pacing:
+"""${contentText}"""
+
+Platform: ${platform}
+Estimated Duration: ${durationSeconds} seconds
+
+Provide a second-by-second estimated retention curve (from second 0 to end) with critical drop-off points, overall score (1-100), first 3 seconds score, pacing score, and curiosity score.
+Identify exactly where viewers will get bored or click away, and provide the exact fix.
+
+Return strictly JSON:
+{
+  "overallScore": number (1-100),
+  "first3SecondsScore": number (1-100),
+  "pacingScore": number (1-100),
+  "curiosityScore": number (1-100),
+  "retentionCurve": [
+    { "second": number, "percentage": number, "label": string, "isDropRisk": boolean }
+  ],
+  "dropOffRisks": [
+    { "timestamp": string, "issue": string, "fixSuggestion": string }
+  ],
+  "viralRetentionFixes": [string]
+}`;
+
+  if (!ai) {
+    return res.json({
+      success: true,
+      data: generateFallbackRetention(durationSeconds),
+      isFallback: true,
+    });
+  }
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.8-flash',
+      contents: prompt,
+      config: { responseMimeType: 'application/json' },
+    });
+    const parsed = JSON.parse(response.text || '{}');
+    return res.json({ success: true, data: parsed, isFallback: false });
+  } catch (err: any) {
+    return res.json({
+      success: true,
+      data: generateFallbackRetention(durationSeconds),
+      isFallback: true,
+    });
+  }
+});
+
+// 10. Complete Topic-to-Video Intelligence Workflow Endpoint
+app.post('/api/gemini/topic-to-video', async (req, res) => {
+  const {
+    topic,
+    language = 'urdu',
+    aspectRatio = '16:9',
+    durationMinutes = 2,
+    tone = 'Cinematic, Investigative and Engaging',
+  } = req.body;
+
+  if (!topic || !topic.trim()) {
+    return res.status(400).json({ error: 'Topic is required for Topic-to-Video workflow' });
+  }
+
+  const prompt = `You are the executive producer of NEXORA AI.
+Topic: "${topic}"
+Primary Language: ${language}
+Aspect Ratio: ${aspectRatio}
+Duration: ~${durationMinutes} minutes (${durationMinutes * 60} seconds)
+Tone: ${tone}
+
+Execute a complete end-to-end Topic-to-Video production package:
+1. Conduct fact-based research summary.
+2. Select the ultimate high-retention hook.
+3. Write a scene-by-scene production script strictly in ${language}.
+4. Provide precise English stock video search keywords for Pexels footage matching each scene.
+5. Provide matching background music recommendation from: 'Cinematic Documentary', 'Emotional', 'Suspense', 'Motivational', 'Islamic Ambient', 'Corporate', 'Technology', 'News'.
+6. Generate 4K thumbnail design prompt and title/description/tags for YouTube.
+
+Return strictly JSON:
+{
+  "topic": string,
+  "primaryLanguage": "${language}",
+  "aspectRatio": "${aspectRatio}",
+  "researchSummary": string,
+  "hook": string,
+  "scenes": [
+    {
+      "sceneNumber": number,
+      "title": string,
+      "visualDescription": string,
+      "stockSearchQuery": string,
+      "urduNarration": string (written in ${language}),
+      "englishSubtitle": string,
+      "durationSeconds": number,
+      "transition": "fade" | "zoom" | "slide" | "cut",
+      "soundEffect": string
+    }
+  ],
+  "musicRecommendation": {
+    "trackStyle": string,
+    "category": string,
+    "tempoBpm": number,
+    "mood": string
+  },
+  "thumbnailPrompt": string,
+  "youtubeSeo": {
+    "titles": [string],
+    "description": string,
+    "tags": [string],
+    "hashtags": [string]
+  }
+}`;
+
+  if (!ai) {
+    return res.json({
+      success: true,
+      data: generateFallbackDocumentary(topic, durationMinutes),
+      isFallback: true,
+    });
+  }
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.8-flash',
+      contents: prompt,
+      config: { responseMimeType: 'application/json' },
+    });
+    const parsed = JSON.parse(response.text || '{}');
+    return res.json({ success: true, data: parsed, isFallback: false });
+  } catch (err: any) {
+    return res.json({
+      success: true,
+      data: generateFallbackDocumentary(topic, durationMinutes),
+      isFallback: true,
+    });
   }
 });
 
@@ -717,6 +1149,256 @@ function generateFallbackIslamicReel(topic: string) {
       caption: `ہمیشہ یاد رکھیں کہ اللہ کی رحمت مایوسی سے کہیں بڑی ہے۔ ❤️\n\n📌 حوالہ: سورۃ الشرح\n\n#IslamicReels #UrduBayan #QuranicPeace #IslamicStatus #NexoraAI`,
       hashtags: ['#IslamicReels', '#QuranQuotes', '#UrduReminders', '#IslamicStatus', '#PeacefulReflection'],
     },
+  };
+}
+
+// Fallback generator for 10 Unique Hooks
+function generateFallbackHooks(topic: string, language: string, platform: string) {
+  const isUrdu = language === 'urdu';
+  const isArabic = language === 'arabic';
+
+  return {
+    topic,
+    targetAudience: 'Global audience & digital creators',
+    platform,
+    primaryLanguage: language,
+    videoDuration: '3-5 minutes',
+    tone: 'Curiosity & High Stakes',
+    hooks: [
+      {
+        id: 'hk-1',
+        hookType: 'Curiosity',
+        openingLine: isUrdu
+          ? `ایک ایسا راز جسے میڈیا نے آپ سے چھپایا، مگر آج سچ سامنے آ رہا ہے۔`
+          : isArabic
+          ? `السر الذي تم إخفاؤه لسنوات طويلة ينكشف اليوم أمام الجميع.`
+          : `There is a single documented truth about ${topic} that changes everything you know.`,
+        first3SecondsAction: 'Fast zoom on classified document or redacted headline',
+        suggestedFootage: 'dark investigative desk with documents and magnifying glass',
+        voicePacingStyle: 'Low whisper building into authoritative revelation',
+        soundEffectCue: 'Cinematic Sub Boom',
+        onScreenText: isUrdu ? 'وہ سچ جو سب نے چھپایا' : 'THE UNTOLD TRUTH',
+      },
+      {
+        id: 'hk-2',
+        hookType: 'Emotional',
+        openingLine: isUrdu
+          ? `اگر آپ بھی اس پریشانی سے گزر رہے ہیں، تو یہ ویڈیو آپ کے لیے آخری امید بن سکتی ہے۔`
+          : isArabic
+          ? `إذا كنت تشعر أن الأبواب قد أغلقت، فهذه الكلمات لك أنت تحديداً.`
+          : `If you have ever felt like giving up on this journey, watch the next 60 seconds.`,
+        first3SecondsAction: 'Slow motion shot of solitary figure looking at horizon',
+        suggestedFootage: 'solitary silhouette person looking out over city dawn',
+        voicePacingStyle: 'Warm, empathetic, sincere and deep',
+        soundEffectCue: 'Air Whip Whoosh',
+        onScreenText: isUrdu ? 'کیا آپ مایوس ہیں؟' : 'DO NOT GIVE UP',
+      },
+      {
+        id: 'hk-3',
+        hookType: 'Documentary',
+        openingLine: isUrdu
+          ? `یہ کہانی صرف ایک واقعے کی نہیں، بلکہ اربوں ڈالر کے اس انقلاب کی ہے جس نے دنیا بدل دی۔`
+          : isArabic
+          ? `هذه ليست مجرد قصة عادية، بل هي الثورة التي أعادت رسم خريطة الاقتصاد العالمي.`
+          : `In the history of modern business, few revolutions happened as quietly or ruthlessly as ${topic}.`,
+        first3SecondsAction: 'Rapid montage of global skylines and stock tickers',
+        suggestedFootage: 'metropolitan skyscraper night traffic time-lapse',
+        voicePacingStyle: 'Authoritative, calm, objective documentary cadence',
+        soundEffectCue: 'Cinematic Sub Boom',
+        onScreenText: isUrdu ? 'عالمی انقلاب کی ابتدا' : 'THE GLOBAL SHIFT',
+      },
+      {
+        id: 'hk-4',
+        hookType: 'Question',
+        openingLine: isUrdu
+          ? `کیا آپ جانتے ہیں کہ صرف اگلے 3 سالوں میں آپ کا کام کرنے کا طریقہ کیسے بدلنے والا ہے؟`
+          : isArabic
+          ? `هل تعلم كيف ستتغير حياتك وعملك بالكامل خلال السنوات الثلاث القادمة؟`
+          : `Have you ever wondered why 99% of people misunderstand the real power of ${topic}?`,
+        first3SecondsAction: 'Direct gaze into lens with rapid cut on question mark',
+        suggestedFootage: 'person looking directly into camera in high tech room',
+        voicePacingStyle: 'Direct inquiry with a 1-second pause after question',
+        soundEffectCue: 'Suspense Riser',
+        onScreenText: isUrdu ? 'کیا آپ تیار ہیں؟' : 'ARE YOU PREPARED?',
+      },
+      {
+        id: 'hk-5',
+        hookType: 'Shocking Stat',
+        openingLine: isUrdu
+          ? `ایک محتاط اندازے کے مطابق 85 فیصد کمپنیاں اس ایک غلطی کی وجہ سے برباد ہو گئیں۔`
+          : isArabic
+          ? `أكثر من 85 بالمائة يفشلون في هذه النقطة بالتحديد دون أن يدركوا السبب.`
+          : `Over 85% of people fail at this before even understanding the underlying rule.`,
+        first3SecondsAction: 'Counter ticking rapidly from 0% to 85% with red alert glow',
+        suggestedFootage: 'digital finance chart crashing into red zone',
+        voicePacingStyle: 'Fast, urgent and alarming delivery',
+        soundEffectCue: 'Sub-Bass Drop',
+        onScreenText: '85% FAILED HERE',
+      },
+      {
+        id: 'hk-6',
+        hookType: 'Contrast / Paradox',
+        openingLine: isUrdu
+          ? `ہم سمجھتے ہیں کہ کامیابی محنت سے ملتی ہے، لیکن حقیقت اس کے بالکل برعکس ہے۔`
+          : isArabic
+          ? `الجميع يظن أن الطريق يبدأ من هنا، لكن الواقع يثبت العكس تماماً.`
+          : `We are told that working harder is the answer. The real billionaires did the exact opposite.`,
+        first3SecondsAction: 'Split screen comparing two opposite actions',
+        suggestedFootage: 'split screen chaotic crowded office vs calm empty penthouse',
+        voicePacingStyle: 'Contrasting pitch: high then suddenly low and steady',
+        soundEffectCue: 'Vinyl Scratch',
+        onScreenText: isUrdu ? 'حقیقت بمقابلہ وہم' : 'THE PARADOX',
+      },
+      {
+        id: 'hk-7',
+        hookType: 'Story / Anecdote',
+        openingLine: isUrdu
+          ? `یہ بات 2020 کی ہے، جب ایک بند کمرے میں لیے گئے فیصلے نے پوری مارکیٹ ہلا دی۔`
+          : isArabic
+          ? `في غرفة اجتماعات مغلقة، صدر قرار واحد غيّر مسار السوق إلى الأبد.`
+          : `It started inside a nondescript room with a single decision nobody was supposed to notice.`,
+        first3SecondsAction: 'Close up on vintage phone ringing or door slowly opening',
+        suggestedFootage: 'dark boardroom leather chairs and dim spotlight',
+        voicePacingStyle: 'Narrative storytelling tempo, deliberate pauses',
+        soundEffectCue: 'Air Whip Whoosh',
+        onScreenText: isUrdu ? 'بند کمرے کا فیصلہ' : 'THE CLOSED DOOR',
+      },
+      {
+        id: 'hk-8',
+        hookType: 'Challenge / Direct',
+        openingLine: isUrdu
+          ? `میں شرط لگا کر کہہ سکتا ہوں کہ آپ نے اس زاویے سے کبھی نہیں سوچا ہوگا۔`
+          : isArabic
+          ? `أتحداك أنك لم تنظر إلى هذا الموضوع بهذه الطريقة من قبل.`
+          : `Stop scrolling. If you care about your future in 2026, test yourself on this.`,
+        first3SecondsAction: 'Snapping fingers directly at camera',
+        suggestedFootage: 'dynamic forward tracking shot in futuristic hallway',
+        voicePacingStyle: 'Firm, assertive, eye-contact tone',
+        soundEffectCue: 'Cinematic Sub Boom',
+        onScreenText: isUrdu ? 'ایک کھلا چیلنج' : 'TEST YOURSELF',
+      },
+      {
+        id: 'hk-9',
+        hookType: 'Visual Hook',
+        openingLine: isUrdu
+          ? `جو منظر آپ ابھی اپنی اسکرین پر دیکھ رہے ہیں، وہ کوئی عام ویڈیو نہیں ہے۔`
+          : isArabic
+          ? `ما تشاهده الآن على شاشتك ليس مجرد مشهد عابر، بل هو بداية قصة لا تصدق.`
+          : `What you are seeing on screen right now is the exact moment everything tipped.`,
+        first3SecondsAction: 'Hyper-lapse footage reversing backwards in time',
+        suggestedFootage: 'reversed footage of collapsing sand or exploding water droplet',
+        voicePacingStyle: 'Dramatic, synchronized with visual impact beat',
+        soundEffectCue: 'Suspense Riser',
+        onScreenText: isUrdu ? 'غور سے دیکھیں' : 'LOOK CLOSELY',
+      },
+      {
+        id: 'hk-10',
+        hookType: 'Urgency',
+        openingLine: isUrdu
+          ? `وقت ختم ہو رہا ہے۔ اگر آپ نے آج یہ نہ سمجھا، تو شاید بہت دیر ہو چکی ہوگی۔`
+          : isArabic
+          ? `الوقت ينفد بسرعة، وإذا فاتتك هذه الفرصة اليوم قد لا تعود مجدداً.`
+          : `The window is closing faster than most people realize. Here is what happens next.`,
+        first3SecondsAction: 'Sand slipping through hourglass or digital clock counting down',
+        suggestedFootage: 'golden hourglass with sand running out against black backdrop',
+        voicePacingStyle: 'Urgent, quick, no hesitation',
+        soundEffectCue: 'Cinematic Sub Boom',
+        onScreenText: isUrdu ? 'وقت تیزی سے گزر رہا ہے' : 'TIME IS RUNNING OUT',
+      },
+    ],
+  };
+}
+
+// Fallback generator for Link Analysis
+function generateFallbackLinkAnalysis(url: string, platform: 'YouTube' | 'Instagram' | 'TikTok' | 'Unknown') {
+  return {
+    url,
+    platform,
+    topic: 'High-Retention Video Formula & Pacing Case Study',
+    niche: 'Digital Media & Storytelling',
+    estimatedDuration: '45 - 90 seconds',
+    storyStructure: {
+      hook: 'High-energy visual disruption in the first 2.5 seconds with on-screen bold text',
+      problem: 'Introduces a relatable pain point or unanswered curiosity gap within 8 seconds',
+      escalation: 'Piles on 3 rapid proofs, b-roll cuts, or data points to maintain dopamine loop',
+      climax: 'Delivers the primary insight or plot twist with a music swell',
+      resolution: 'Quick, natural call to action without dragging closing fluff',
+    },
+    transcriptSummary: 'This content uses structured micro-hooks and high cutting frequency (every 2-3 seconds) to maintain above 70% retention through the midpoint.',
+    keyTakeaways: [
+      'Visual cut every 2.4 seconds to eliminate drop-off',
+      'Music track ducks during vocal punches to maximize speech clarity',
+      'Never uses stationary camera without animated subtitle highlights',
+      'Hook introduces a question that is only answered at the 80% mark',
+    ],
+    editingStyle: {
+      pacing: 'Rapid-fire (18-24 cuts per minute)',
+      cutsPerMinute: '~22 cuts/min',
+      bRollDensity: 'Heavy (stock b-roll layered over narration)',
+      colorGradeVibe: 'High-contrast cinematic with dark vignetting',
+      musicVibe: 'Cinematic Tension & Hybrid Trap Beat',
+    },
+    hookAnatomy: {
+      openingLine: 'Shocking statement delivered with zero introductory greeting',
+      retentionDriver: 'Curiosity gap with high stakes payoff',
+      visualTrigger: 'Rapid kinetic typography and sound effect impact',
+    },
+    visualStyle: 'Modern dark mode with electric blue and purple neon text accents',
+    actionSuggestions: {
+      originalScriptTopic: 'Create an original deep-dive on modern industry disruptions using the same 5-part retention curve.',
+      styleInspirationNotes: 'Emulate the 2.5s cut pacing and sound effect punctuation while writing original narration.',
+      userUploadTips: 'Record talking head in 4K, overlay relevant Pexels footage every 3 seconds, and apply audio ducking.',
+    },
+  };
+}
+
+// Fallback generator for Retention Analysis
+function generateFallbackRetention(durationSeconds: number) {
+  const steps = Math.min(20, Math.max(8, Math.floor(durationSeconds / 10)));
+  const curve = [];
+  let pct = 100;
+
+  for (let i = 0; i <= steps; i++) {
+    const sec = Math.round((i / steps) * durationSeconds);
+    if (i === 0) pct = 100;
+    else if (i === 1) pct = 82; // Initial hook retention drop
+    else if (i === 2) pct = 76;
+    else if (i === Math.floor(steps * 0.4)) pct = 68; // Midpoint drop
+    else if (i === Math.floor(steps * 0.7)) pct = 62;
+    else pct = Math.max(48, pct - Math.round(Math.random() * 3 + 1));
+
+    curve.push({
+      second: sec,
+      percentage: pct,
+      label: sec === 0 ? 'Video Start' : sec < 5 ? 'First 3s Hook' : sec === Math.round(durationSeconds / 2) ? 'Midpoint' : undefined,
+      isDropRisk: i === 1 || i === Math.floor(steps * 0.4),
+    });
+  }
+
+  return {
+    overallScore: 88,
+    first3SecondsScore: 92,
+    pacingScore: 85,
+    curiosityScore: 89,
+    retentionCurve: curve,
+    dropOffRisks: [
+      {
+        timestamp: '0:03 - 0:06',
+        issue: 'Viewer drop-off risk right after opening line if b-roll transition is delayed',
+        fixSuggestion: 'Insert a dramatic transition sound effect (Whoosh or Boom) and switch stock footage at second 3.0.',
+      },
+      {
+        timestamp: '0:45 - 0:55',
+        issue: 'Pacing slows down during explanatory background section',
+        fixSuggestion: 'Break monologue into two short punchy sentences with an on-screen statistic or graphic overlay.',
+      },
+    ],
+    viralRetentionFixes: [
+      'Eliminate all greetings ("Hello viewers", "Welcome back") in first 3 seconds',
+      'Add micro-curiosity loops every 25 seconds ("And that led to an even bigger problem...")',
+      'Keep subtitle font centered and brightly styled with high-contrast background highlights',
+      'Use music auto-ducking to make narration cut through clearly',
+    ],
   };
 }
 

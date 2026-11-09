@@ -100,6 +100,28 @@ export class UrduVoiceService {
     });
   }
 
+  public getVoicesForLanguage(targetLang: string = 'urdu'): VoiceOption[] {
+    const list = this.getVoiceOptions();
+    const l = targetLang.toLowerCase();
+    if (l.includes('urdu') || l.includes('roman')) {
+      const urduOrReg = list.filter((v) => v.isUrdu || v.isRegional);
+      return urduOrReg.length > 0 ? urduOrReg : list;
+    }
+    if (l.includes('english')) {
+      const eng = list.filter((v) => v.lang.toLowerCase().startsWith('en'));
+      return eng.length > 0 ? eng : list;
+    }
+    if (l.includes('arabic')) {
+      const ar = list.filter((v) => v.lang.toLowerCase().startsWith('ar'));
+      return ar.length > 0 ? ar : list;
+    }
+    if (l.includes('hindi')) {
+      const hi = list.filter((v) => v.lang.toLowerCase().startsWith('hi'));
+      return hi.length > 0 ? hi : list;
+    }
+    return list;
+  }
+
   public checkSupport(): SpeechSupportInfo {
     const isSupported = typeof window !== 'undefined' && 'speechSynthesis' in window;
     const voices = this.getVoiceOptions();

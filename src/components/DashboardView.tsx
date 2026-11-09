@@ -15,6 +15,12 @@ import {
   Video,
   Layers,
   FolderOpen,
+  Flame,
+  Link2,
+  Wand2,
+  Music2,
+  Subtitles,
+  Zap,
 } from 'lucide-react';
 import { Project } from '../types';
 import { TabType } from './Sidebar';
@@ -136,6 +142,81 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {/* Studio: Complete Video Maker */}
+          <div
+            onClick={() => onSelectTab('complete_video_maker')}
+            className="group cursor-pointer p-6 rounded-2xl bg-gradient-to-b from-[#0b1c2b] to-[#090d16] border border-cyan-500/30 hover:border-cyan-400/60 shadow-lg hover:shadow-cyan-950/60 transition-all duration-300"
+          >
+            <div className="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 mb-4 group-hover:scale-110 transition-transform">
+              <Sparkles className="w-6 h-6" />
+            </div>
+            <div className="flex items-center gap-2 mb-1.5">
+              <h4 className="font-bold text-white text-base group-hover:text-cyan-300 transition-colors">
+                Complete Video Maker
+              </h4>
+              <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300">
+                12-Step AI
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 leading-relaxed mb-4">
+              End-to-end intelligent pipeline: enters 1 topic and generates script, voice, stock clips, music, subtitles, and final video.
+            </p>
+            <div className="flex items-center text-xs font-semibold text-cyan-400 group-hover:translate-x-1 transition-transform">
+              <span>Launch Pipeline</span>
+              <ArrowRight className="w-3.5 h-3.5 ml-1" />
+            </div>
+          </div>
+
+          {/* Studio: Hook Designer */}
+          <div
+            onClick={() => onSelectTab('hook_designer')}
+            className="group cursor-pointer p-6 rounded-2xl bg-gradient-to-b from-[#22170b] to-[#090d16] border border-amber-500/30 hover:border-amber-400/60 shadow-lg hover:shadow-amber-950/60 transition-all duration-300"
+          >
+            <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-4 group-hover:scale-110 transition-transform">
+              <Flame className="w-6 h-6" />
+            </div>
+            <div className="flex items-center gap-2 mb-1.5">
+              <h4 className="font-bold text-white text-base group-hover:text-amber-300 transition-colors">
+                Advanced Hook Designer
+              </h4>
+              <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">
+                10 Styles
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 leading-relaxed mb-4">
+              First 3 seconds optimization with 10 psychology-backed hook formulas, vocal tone guidance, and transition SFX.
+            </p>
+            <div className="flex items-center text-xs font-semibold text-amber-400 group-hover:translate-x-1 transition-transform">
+              <span>Design Hooks</span>
+              <ArrowRight className="w-3.5 h-3.5 ml-1" />
+            </div>
+          </div>
+
+          {/* Studio: Video Link Analyzer */}
+          <div
+            onClick={() => onSelectTab('video_link_analyzer')}
+            className="group cursor-pointer p-6 rounded-2xl bg-gradient-to-b from-[#0c1f24] to-[#090d16] border border-teal-500/30 hover:border-teal-400/60 shadow-lg hover:shadow-teal-950/60 transition-all duration-300"
+          >
+            <div className="w-12 h-12 rounded-xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-400 mb-4 group-hover:scale-110 transition-transform">
+              <Link2 className="w-6 h-6" />
+            </div>
+            <div className="flex items-center gap-2 mb-1.5">
+              <h4 className="font-bold text-white text-base group-hover:text-teal-300 transition-colors">
+                Video Link Analyzer
+              </h4>
+              <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-300">
+                YT / IG / TikTok
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 leading-relaxed mb-4">
+              Input any video link: analyzes story structure, hook anatomy, editing pacing, and generates original inspired scripts.
+            </p>
+            <div className="flex items-center text-xs font-semibold text-teal-400 group-hover:translate-x-1 transition-transform">
+              <span>Analyze Link</span>
+              <ArrowRight className="w-3.5 h-3.5 ml-1" />
+            </div>
+          </div>
+
           {/* Studio 1: Business Documentary */}
           <div
             onClick={() => onSelectTab('business_documentary')}
@@ -199,14 +280,64 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 Video Editor &amp; Render
               </h4>
               <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-pink-500/15 text-pink-400">
-                Canvas
+                Multi-Track
               </span>
             </div>
             <p className="text-xs text-slate-400 leading-relaxed mb-4">
-              Arrange scene timeline, upload videos/audio, add background score, and render real MP4/WebM video files.
+              Multi-track timeline, scene split/trim/duplicate, playback speed, and real MP4 export with audio verification.
             </p>
             <div className="flex items-center text-xs font-semibold text-pink-400 group-hover:translate-x-1 transition-transform">
               <span>Launch Editor</span>
+              <ArrowRight className="w-3.5 h-3.5 ml-1" />
+            </div>
+          </div>
+
+          {/* Studio: Script Improver */}
+          <div
+            onClick={() => onSelectTab('script_improver')}
+            className="group cursor-pointer p-6 rounded-2xl bg-gradient-to-b from-[#1d0e22] to-[#090d16] border border-purple-500/30 hover:border-purple-400/60 shadow-lg hover:shadow-purple-950/60 transition-all duration-300"
+          >
+            <div className="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400 mb-4 group-hover:scale-110 transition-transform">
+              <Wand2 className="w-6 h-6" />
+            </div>
+            <div className="flex items-center gap-2 mb-1.5">
+              <h4 className="font-bold text-white text-base group-hover:text-purple-300 transition-colors">
+                Script Improver &amp; Retention
+              </h4>
+              <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300">
+                Retention AI
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 leading-relaxed mb-4">
+              Enhance pacing, remove fluff, optimize Urdu vocabulary, and analyze second-by-second viewer retention curve.
+            </p>
+            <div className="flex items-center text-xs font-semibold text-purple-400 group-hover:translate-x-1 transition-transform">
+              <span>Improve Script</span>
+              <ArrowRight className="w-3.5 h-3.5 ml-1" />
+            </div>
+          </div>
+
+          {/* Studio: Background Music Studio */}
+          <div
+            onClick={() => onSelectTab('music_studio')}
+            className="group cursor-pointer p-6 rounded-2xl bg-gradient-to-b from-[#180f2b] to-[#090d16] border border-indigo-500/30 hover:border-indigo-400/60 shadow-lg hover:shadow-indigo-950/60 transition-all duration-300"
+          >
+            <div className="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 mb-4 group-hover:scale-110 transition-transform">
+              <Music2 className="w-6 h-6" />
+            </div>
+            <div className="flex items-center gap-2 mb-1.5">
+              <h4 className="font-bold text-white text-base group-hover:text-indigo-300 transition-colors">
+                Background Music Studio
+              </h4>
+              <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300">
+                8 Moods
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 leading-relaxed mb-4">
+              8 royalty-free soundtrack categories with instant auditioning, auto-speech ducking (-18dB), and WAV export.
+            </p>
+            <div className="flex items-center text-xs font-semibold text-indigo-400 group-hover:translate-x-1 transition-transform">
+              <span>Open Music Studio</span>
               <ArrowRight className="w-3.5 h-3.5 ml-1" />
             </div>
           </div>
@@ -221,17 +352,42 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
             <div className="flex items-center gap-2 mb-1.5">
               <h4 className="font-bold text-white text-base group-hover:text-blue-300 transition-colors">
-                Urdu Voice Studio
+                Multi-Lang Voice Studio
               </h4>
               <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400">
-                TTS &amp; Mic
+                5 Languages
               </span>
             </div>
             <p className="text-xs text-slate-400 leading-relaxed mb-4">
-              Generate natural Urdu voiceovers, adjust speed/pitch, or record your own voice with live visualizer.
+              High-fidelity speech synthesis for Urdu, English, Roman Urdu, Arabic and Hindi with pitch, speed and WAV downloads.
             </p>
             <div className="flex items-center text-xs font-semibold text-blue-400 group-hover:translate-x-1 transition-transform">
               <span>Open Voice Studio</span>
+              <ArrowRight className="w-3.5 h-3.5 ml-1" />
+            </div>
+          </div>
+
+          {/* Studio: Subtitle Studio */}
+          <div
+            onClick={() => onSelectTab('subtitle_studio')}
+            className="group cursor-pointer p-6 rounded-2xl bg-gradient-to-b from-[#091a26] to-[#090d16] border border-cyan-500/30 hover:border-cyan-400/60 shadow-lg hover:shadow-cyan-950/60 transition-all duration-300"
+          >
+            <div className="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 mb-4 group-hover:scale-110 transition-transform">
+              <Subtitles className="w-6 h-6" />
+            </div>
+            <div className="flex items-center gap-2 mb-1.5">
+              <h4 className="font-bold text-white text-base group-hover:text-cyan-300 transition-colors">
+                Subtitle &amp; Caption Studio
+              </h4>
+              <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300">
+                SRT / VTT
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 leading-relaxed mb-4">
+              Auto-chunking captions with Nastaliq RTL styling, synchronized timestamps, and downloadable SRT/VTT files.
+            </p>
+            <div className="flex items-center text-xs font-semibold text-cyan-400 group-hover:translate-x-1 transition-transform">
+              <span>Open Subtitle Studio</span>
               <ArrowRight className="w-3.5 h-3.5 ml-1" />
             </div>
           </div>

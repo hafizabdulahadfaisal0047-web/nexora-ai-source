@@ -11,6 +11,14 @@ import { ThumbnailGeneratorStudio } from './components/ThumbnailGeneratorStudio'
 import { YoutubeSeoStudio } from './components/YoutubeSeoStudio';
 import { ProjectsManager } from './components/ProjectsManager';
 import { SettingsStudio } from './components/SettingsStudio';
+import { CompleteVideoMakerStudio } from './components/CompleteVideoMakerStudio';
+import { HookDesignerStudio } from './components/HookDesignerStudio';
+import { ScriptImproverStudio } from './components/ScriptImproverStudio';
+import { VideoLinkAnalyzerStudio } from './components/VideoLinkAnalyzerStudio';
+import { MusicStudio } from './components/MusicStudio';
+import { SoundEffectsStudio } from './components/SoundEffectsStudio';
+import { SubtitleStudio } from './components/SubtitleStudio';
+import { VoiceRecorderStudio } from './components/VoiceRecorderStudio';
 import { Project } from './types';
 import { ProjectStore } from './services/projectStore';
 import { fetchSystemStatus, SystemStatus } from './services/api';
@@ -24,6 +32,11 @@ export default function App() {
   const [customPexelsKey, setCustomPexelsKey] = useState<string>(() => {
     return localStorage.getItem('nexora_pexels_api_key') || '';
   });
+
+  // Cross-studio workflow states
+  const [sharedTopic, setSharedTopic] = useState('');
+  const [sharedHook, setSharedHook] = useState('');
+  const [sharedScript, setSharedScript] = useState('');
 
   const refreshProjects = () => {
     const list = ProjectStore.getProjects();
@@ -120,6 +133,14 @@ export default function App() {
             />
           )}
 
+          {currentTab === 'complete_video_maker' && (
+            <CompleteVideoMakerStudio
+              onLoadIntoEditor={handleLoadIntoEditor}
+              onSaveProject={handleSaveProject}
+              customPexelsKey={customPexelsKey}
+            />
+          )}
+
           {currentTab === 'business_documentary' && (
             <BusinessDocumentaryStudio
               onLoadIntoEditor={handleLoadIntoEditor}
@@ -135,20 +156,102 @@ export default function App() {
             />
           )}
 
+          {currentTab === 'hook_designer' && (
+            <HookDesignerStudio
+              onSendToScriptWriter={(hookText, topic) => {
+                setSharedTopic(topic);
+                setSharedHook(hookText);
+                setCurrentTab('script_writer');
+              }}
+              onSendToCompleteMaker={(hookText, topic) => {
+                setSharedTopic(topic);
+                setSharedHook(hookText);
+                setCurrentTab('complete_video_maker');
+              }}
+            />
+          )}
+
           {currentTab === 'script_writer' && (
             <ScriptWriterStudio
               onLoadIntoEditor={handleLoadIntoEditor}
               onOpenVoiceStudio={() => setCurrentTab('urdu_voice')}
+              initialTopic={sharedTopic}
+              initialHook={sharedHook}
+            />
+          )}
+
+          {currentTab === 'script_improver' && (
+            <ScriptImproverStudio
+              onSendToVoiceGenerator={(text: string) => {
+                setSharedScript(text);
+                setCurrentTab('urdu_voice');
+              }}
+              onSendToVideoEditor={() => {
+                handleQuickNewProject();
+              }}
+            />
+          )}
+
+          {currentTab === 'video_link_analyzer' && (
+            <VideoLinkAnalyzerStudio
+              onSendToScriptWriter={(topic: string) => {
+                setSharedTopic(topic);
+                setCurrentTab('script_writer');
+              }}
+              onSendToCompleteMaker={(topic: string) => {
+                setSharedTopic(topic);
+                setCurrentTab('complete_video_maker');
+              }}
+              onOpenVideoEditor={() => {
+                setCurrentTab('video_editor');
+              }}
             />
           )}
 
           {currentTab === 'urdu_voice' && <UrduVoiceStudio />}
+
+          {currentTab === 'voice_recorder' && (
+            <VoiceRecorderStudio
+              onLoadVoiceToEditor={() => {
+                setCurrentTab('video_editor');
+              }}
+            />
+          )}
+
+          {currentTab === 'music_studio' && (
+            <MusicStudio
+              onSelectMusicForProject={(trackName: string) => {
+                if (editingProject) {
+                  const updated = { ...editingProject, bgMusicTrack: trackName };
+                  handleSaveProject(updated);
+                  setEditingProject(updated);
+                }
+                setCurrentTab('video_editor');
+              }}
+            />
+          )}
+
+          {currentTab === 'sfx_studio' && (
+            <SoundEffectsStudio
+              onInsertIntoVideo={() => {
+                setCurrentTab('video_editor');
+              }}
+            />
+          )}
 
           {currentTab === 'video_editor' && (
             <VideoEditorStudio
               currentProject={editingProject}
               onSaveProject={handleSaveProject}
               customPexelsKey={customPexelsKey}
+            />
+          )}
+
+          {currentTab === 'subtitle_studio' && (
+            <SubtitleStudio
+              onLoadSubtitlesToEditor={() => {
+                setCurrentTab('video_editor');
+              }}
             />
           )}
 

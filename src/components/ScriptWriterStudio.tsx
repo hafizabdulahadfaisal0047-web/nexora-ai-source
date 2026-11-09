@@ -18,19 +18,29 @@ import { Project } from '../types';
 interface ScriptWriterStudioProps {
   onLoadIntoEditor: (project: Project) => void;
   onOpenVoiceStudio: () => void;
+  initialTopic?: string;
+  initialHook?: string;
 }
 
 export const ScriptWriterStudio: React.FC<ScriptWriterStudioProps> = ({
   onLoadIntoEditor,
   onOpenVoiceStudio,
+  initialTopic,
+  initialHook,
 }) => {
-  const [topic, setTopic] = useState('');
+  const [topic, setTopic] = useState(initialTopic || '');
   const [format, setFormat] = useState('documentary');
   const [language, setLanguage] = useState('urdu');
   const [tone, setTone] = useState('engaging, investigative and authoritative');
   const [loading, setLoading] = useState(false);
   const [scriptData, setScriptData] = useState<any | null>(null);
   const [copied, setCopied] = useState(false);
+
+  React.useEffect(() => {
+    if (initialTopic) {
+      setTopic(initialTopic);
+    }
+  }, [initialTopic]);
 
   const handleGenerate = async (targetTopic?: string) => {
     const query = targetTopic || topic;

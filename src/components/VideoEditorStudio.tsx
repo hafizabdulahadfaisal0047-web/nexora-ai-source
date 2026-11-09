@@ -23,13 +23,22 @@ import {
   Search,
   Type,
   Video,
+  Copy,
+  Scissors,
+  Gauge,
+  Undo2,
+  Redo2,
+  Sliders,
+  Volume1,
+  Activity,
+  Zap,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { AspectRatio, Project, Resolution, Scene, StockVideo, TransitionType } from '../types';
 import { VideoRenderer, RenderResult, downloadVideoFile } from '../services/videoRenderer';
 import { getCuratedVideos, searchStockVideos } from '../services/api';
 import { UrduVoiceService } from '../services/audioSynthesizer';
-import { generateSoundtrackBuffer } from '../services/audioEngine';
+import { generateSoundtrackBuffer, ROYALTY_FREE_SOUNDTRACKS } from '../services/audioEngine';
 
 interface VideoEditorStudioProps {
   currentProject: Project | null;
@@ -79,13 +88,6 @@ const DEFAULT_SCENES: Scene[] = [
   },
 ];
 
-const BGM_OPTIONS = [
-  { id: 'bgm-1', name: 'Cinematic Tension (Suspense Strings)', mood: 'Tense & High Stakes' },
-  { id: 'bgm-2', name: 'Modern Tech Cyberpunk Beat', mood: 'Futuristic & Fast' },
-  { id: 'bgm-3', name: 'Peaceful Spiritual Ambient Drone', mood: 'Calm & Contemplative' },
-  { id: 'bgm-4', name: 'Epic Corporate Rise & Orchestral', mood: 'Inspiring & Grand' },
-];
-
 export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
   currentProject,
   onSaveProject,
@@ -101,8 +103,48 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
       : DEFAULT_SCENES
   );
 
+  // Undo / Redo history state
+  const [history, setHistory] = useState<Scene[][]>([
+    currentProject?.scenes && currentProject.scenes.length > 0
+      ? currentProject.scenes
+      : DEFAULT_SCENES,
+  ]);
+  const [historyIdx, setHistoryIdx] = useState(0);
+
+  const updateScenesWithHistory = (newScenes: Scene[]) => {
+    const updatedHistory = history.slice(0, historyIdx + 1);
+    updatedHistory.push(newScenes);
+    if (updatedHistory.length > 30) {
+      updatedHistory.shift();
+    }
+    setHistory(updatedHistory);
+    setHistoryIdx(updatedHistory.length - 1);
+    setScenes(newScenes);
+  };
+
+  const handleUndo = () => {
+    if (historyIdx > 0) {
+      const targetIdx = historyIdx - 1;
+      setHistoryIdx(targetIdx);
+      setScenes(history[targetIdx]);
+      if (currentSceneIdx >= history[targetIdx].length) {
+        setCurrentSceneIdx(Math.max(0, history[targetIdx].length - 1));
+      }
+    }
+  };
+
+  const handleRedo = () => {
+    if (historyIdx < history.length - 1) {
+      const targetIdx = historyIdx + 1;
+      setHistoryIdx(targetIdx);
+      setScenes(history[targetIdx]);
+    }
+  };
+
   // Background music & Voiceover audio controls
-  const [bgMusic, setBgMusic] = useState<string>(currentProject?.bgMusicTrack || 'Cinematic Tension (Suspense Strings)');
+  const [bgMusic, setBgMusic] = useState<string>(
+    currentProject?.bgMusicTrack || 'Cinematic Documentary'
+  );
   const [bgMusicVolume, setBgMusicVolume] = useState<number>(currentProject?.bgMusicVolume ?? 0.35);
   const [customAudioUrl, setCustomAudioUrl] = useState<string | null>(null);
 
@@ -138,6 +180,17 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
     };
   }, []);
 
+  // Calculate total timeline duration
+  const totalDuration = scenes.reduce((acc, s) => acc + (s.durationSeconds || 5), 0);
+  const activeScene = scenes[currentSceneIdx] || scenes[0];
+
+  // Sync playback rate with active scene speed
+  useEffect(() => {
+    if (videoPlayerRef.current) {
+      videoPlayerRef.current.playbackRate = activeScene?.speed || 1;
+    }
+  }, [currentSceneIdx, activeScene?.speed]);
+
   // Stock footage replacement modal
   const [stockModalSceneIdx, setStockModalSceneIdx] = useState<number | null>(null);
   const [stockQuery, setStockQuery] = useState('');
@@ -151,10 +204,6 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
   const [renderResult, setRenderResult] = useState<RenderResult | null>(null);
   const rendererRef = useRef<VideoRenderer | null>(null);
 
-  // Calculate total timeline duration
-  const totalDuration = scenes.reduce((acc, s) => acc + (s.durationSeconds || 5), 0);
-  const activeScene = scenes[currentSceneIdx] || scenes[0];
-
   useEffect(() => {
     if (currentProject) {
       setProjectTitle(currentProject.title);
@@ -162,6 +211,8 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
       setResolution(currentProject.resolution || '1080p');
       if (currentProject.scenes && currentProject.scenes.length > 0) {
         setScenes(currentProject.scenes);
+        setHistory([currentProject.scenes]);
+        setHistoryIdx(0);
         setCurrentSceneIdx(0);
       }
     }
@@ -351,25 +402,89 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
   const handleSceneDurationChange = (index: number, newDur: number) => {
     const updated = [...scenes];
     updated[index] = { ...updated[index], durationSeconds: Math.max(1, newDur) };
-    setScenes(updated);
+    updateScenesWithHistory(updated);
   };
 
   const handleSceneTransitionChange = (index: number, trans: TransitionType) => {
     const updated = [...scenes];
     updated[index] = { ...updated[index], transition: trans };
-    setScenes(updated);
+    updateScenesWithHistory(updated);
   };
 
   const handleSceneNarrationChange = (index: number, text: string) => {
     const updated = [...scenes];
     updated[index] = { ...updated[index], urduNarration: text };
-    setScenes(updated);
+    updateScenesWithHistory(updated);
   };
 
   const handleSceneSubtitleChange = (index: number, text: string) => {
     const updated = [...scenes];
     updated[index] = { ...updated[index], englishSubtitle: text };
-    setScenes(updated);
+    updateScenesWithHistory(updated);
+  };
+
+  const handleSceneSpeedChange = (index: number, speed: number) => {
+    const updated = [...scenes];
+    updated[index] = { ...updated[index], speed };
+    updateScenesWithHistory(updated);
+    if (videoPlayerRef.current) {
+      videoPlayerRef.current.playbackRate = speed;
+    }
+  };
+
+  const handleSplitScene = (index: number) => {
+    const target = scenes[index];
+    if (!target) return;
+    const dur = target.durationSeconds || 6;
+    const half1 = Math.max(2, Math.floor(dur / 2));
+    const half2 = Math.max(2, Math.ceil(dur / 2));
+
+    let nar1 = target.urduNarration;
+    let nar2 = target.urduNarration;
+    if (target.urduNarration.includes('،') || target.urduNarration.includes('۔') || target.urduNarration.includes('.')) {
+      const parts = target.urduNarration.split(/(?<=[،۔.])/);
+      if (parts.length >= 2) {
+        nar1 = parts.slice(0, Math.ceil(parts.length / 2)).join(' ').trim();
+        nar2 = parts.slice(Math.ceil(parts.length / 2)).join(' ').trim();
+      }
+    }
+
+    const sceneA: Scene = {
+      ...target,
+      title: `${target.title} (Part 1)`,
+      durationSeconds: half1,
+      urduNarration: nar1,
+    };
+    const sceneB: Scene = {
+      ...target,
+      id: `sc_split_${Date.now()}`,
+      sceneNumber: target.sceneNumber + 1,
+      title: `${target.title} (Part 2)`,
+      durationSeconds: half2,
+      urduNarration: nar2,
+    };
+
+    const updated = [...scenes.slice(0, index), sceneA, sceneB, ...scenes.slice(index + 1)].map((s, i) => ({
+      ...s,
+      sceneNumber: i + 1,
+    }));
+    updateScenesWithHistory(updated);
+  };
+
+  const handleDuplicateScene = (index: number) => {
+    const target = scenes[index];
+    if (!target) return;
+    const clone: Scene = {
+      ...target,
+      id: `sc_dup_${Date.now()}`,
+      title: `${target.title} (Copy)`,
+    };
+    const updated = [...scenes.slice(0, index + 1), clone, ...scenes.slice(index + 1)].map((s, i) => ({
+      ...s,
+      sceneNumber: i + 1,
+    }));
+    updateScenesWithHistory(updated);
+    setCurrentSceneIdx(index + 1);
   };
 
   const handleMoveScene = (index: number, direction: 'left' | 'right') => {
@@ -384,7 +499,7 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
     const temp = updated[index];
     updated[index] = updated[targetIdx];
     updated[targetIdx] = temp;
-    setScenes(updated);
+    updateScenesWithHistory(updated);
     setCurrentSceneIdx(targetIdx);
   };
 
@@ -394,7 +509,7 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
       return;
     }
     const updated = scenes.filter((_, i) => i !== index);
-    setScenes(updated);
+    updateScenesWithHistory(updated);
     if (currentSceneIdx >= updated.length) {
       setCurrentSceneIdx(updated.length - 1);
     }
@@ -413,8 +528,10 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
       englishSubtitle: 'Enter your new scene subtitle here.',
       durationSeconds: 6,
       transition: 'fade',
+      speed: 1,
     };
-    setScenes([...scenes, newScene]);
+    const updated = [...scenes, newScene];
+    updateScenesWithHistory(updated);
     setCurrentSceneIdx(scenes.length);
   };
 
@@ -832,9 +949,9 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
                   onChange={(e) => setBgMusic(e.target.value)}
                   className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 outline-none"
                 >
-                  {BGM_OPTIONS.map((opt) => (
+                  {ROYALTY_FREE_SOUNDTRACKS.map((opt) => (
                     <option key={opt.id} value={opt.name}>
-                      {opt.name} ({opt.mood})
+                      {opt.name} ({opt.category})
                     </option>
                   ))}
                 </select>
@@ -904,6 +1021,20 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
 
               <div className="flex items-center gap-1.5">
                 <button
+                  onClick={() => handleSplitScene(currentSceneIdx)}
+                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-400"
+                  title="Split Scene at Half"
+                >
+                  <Scissors className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => handleDuplicateScene(currentSceneIdx)}
+                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-purple-400"
+                  title="Duplicate Scene"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                </button>
+                <button
                   onClick={() => handleMoveScene(currentSceneIdx, 'left')}
                   disabled={currentSceneIdx === 0}
                   className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-30"
@@ -929,11 +1060,11 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
               </div>
             </div>
 
-            {/* Scene Duration & Transition */}
-            <div className="grid grid-cols-2 gap-3">
+            {/* Scene Duration, Transition & Speed */}
+            <div className="grid grid-cols-3 gap-2.5">
               <div>
-                <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-                  DURATION (SECONDS)
+                <label className="block text-[10px] font-semibold text-slate-400 mb-1">
+                  DURATION (SEC)
                 </label>
                 <input
                   type="number"
@@ -943,25 +1074,45 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
                   onChange={(e) =>
                     handleSceneDurationChange(currentSceneIdx, parseInt(e.target.value, 10) || 5)
                   }
-                  className="w-full px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-white outline-none"
+                  className="w-full px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-white outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-                  TRANSITION EFFECT
+                <label className="block text-[10px] font-semibold text-slate-400 mb-1">
+                  TRANSITION
                 </label>
                 <select
                   value={activeScene?.transition || 'fade'}
                   onChange={(e) =>
                     handleSceneTransitionChange(currentSceneIdx, e.target.value as TransitionType)
                   }
-                  className="w-full px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white outline-none"
+                  className="w-full px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white outline-none"
                 >
-                  <option value="fade">Fade In/Out</option>
-                  <option value="zoom">Dynamic Zoom In</option>
-                  <option value="slide">Cinematic Slide</option>
-                  <option value="cut">Direct Cut</option>
+                  <option value="fade">Fade</option>
+                  <option value="zoom">Zoom</option>
+                  <option value="slide">Slide</option>
+                  <option value="cut">Cut</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-semibold text-cyan-400 mb-1">
+                  SPEED
+                </label>
+                <select
+                  value={activeScene?.speed || 1}
+                  onChange={(e) =>
+                    handleSceneSpeedChange(currentSceneIdx, parseFloat(e.target.value))
+                  }
+                  className="w-full px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-cyan-300 outline-none"
+                >
+                  <option value="0.5">0.5x</option>
+                  <option value="0.75">0.75x</option>
+                  <option value="1">1.0x (Norm)</option>
+                  <option value="1.25">1.25x</option>
+                  <option value="1.5">1.5x</option>
+                  <option value="2">2.0x</option>
                 </select>
               </div>
             </div>
@@ -1022,62 +1173,235 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
         </div>
       </div>
 
-      {/* Bottom Timeline Scene Cards Carousel */}
-      <div className="p-5 rounded-3xl bg-slate-900/90 border border-slate-800 space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Layers className="w-4 h-4 text-cyan-400" />
-            <span className="text-sm font-bold text-white">Timeline Storyboard</span>
-            <span className="text-xs text-slate-400">({scenes.length} Scenes)</span>
+      {/* Bottom Multi-Track Timeline & Storyboard Studio */}
+      <div className="p-5 rounded-3xl bg-slate-900/95 border border-slate-800 space-y-4 shadow-2xl">
+        {/* Timeline Control Bar with Undo/Redo & Scene Actions */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Layers className="w-4 h-4 text-cyan-400" />
+              <span className="text-sm font-bold text-white">Multi-Track Timeline</span>
+              <span className="text-xs font-mono text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-md border border-cyan-500/20">
+                {scenes.length} Scenes • {totalDuration}s
+              </span>
+            </div>
+
+            {/* Undo / Redo controls */}
+            <div className="flex items-center gap-1 bg-slate-800/80 rounded-xl p-1 border border-slate-700/60">
+              <button
+                onClick={handleUndo}
+                disabled={historyIdx <= 0}
+                className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-700/60 disabled:opacity-30 disabled:hover:bg-transparent"
+                title="Undo edit (Ctrl+Z)"
+              >
+                <Undo2 className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={handleRedo}
+                disabled={historyIdx >= history.length - 1}
+                className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-700/60 disabled:opacity-30 disabled:hover:bg-transparent"
+                title="Redo edit (Ctrl+Y)"
+              >
+                <Redo2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
 
-          <button
-            onClick={handleAddScene}
-            className="px-3.5 py-1.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 text-xs font-semibold flex items-center gap-1.5 transition-all"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Add New Scene</span>
-          </button>
+          {/* Quick Scene Operations */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleSplitScene(currentSceneIdx)}
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-all"
+              title="Split selected scene into two segments"
+            >
+              <Scissors className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Split S{currentSceneIdx + 1}</span>
+            </button>
+
+            <button
+              onClick={() => handleDuplicateScene(currentSceneIdx)}
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-purple-300 border border-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-all"
+              title="Duplicate selected scene"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Duplicate</span>
+            </button>
+
+            <button
+              onClick={handleAddScene}
+              className="px-3.5 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/40 text-xs font-bold flex items-center gap-1.5 transition-all"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add Scene</span>
+            </button>
+          </div>
         </div>
 
-        {/* Horizontal Scene Strip */}
-        <div className="flex gap-4 overflow-x-auto pb-2 pt-1">
-          {scenes.map((scene, idx) => (
-            <div
-              key={scene.id}
-              onClick={() => {
-                setCurrentSceneIdx(idx);
-                setIsPlaying(false);
-              }}
-              className={`flex-shrink-0 w-64 rounded-2xl overflow-hidden border cursor-pointer transition-all ${
-                currentSceneIdx === idx
-                  ? 'border-cyan-400 bg-slate-800/90 shadow-xl shadow-cyan-950/40 ring-2 ring-cyan-500/20'
-                  : 'border-slate-800 bg-slate-950/70 hover:border-slate-700'
-              }`}
-            >
-              <div className="relative aspect-video bg-slate-900">
-                <img
-                  src={
-                    scene.previewUrl ||
-                    'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=800&auto=format&fit=crop&q=80'
-                  }
-                  alt={scene.title}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-black/70 text-[10px] font-bold text-cyan-400">
-                  #{idx + 1}
+        {/* Multi-Track Stack */}
+        <div className="space-y-2.5">
+          {/* TRACK 1: Video & Visuals Track */}
+          <div className="space-y-1">
+            <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 px-1">
+              <span className="flex items-center gap-1.5 text-cyan-300">
+                <Video className="w-3.5 h-3.5" />
+                <span>TRACK 1: VISUAL &amp; FOOTAGE</span>
+              </span>
+              <span className="text-[10px] text-slate-400">Click clip to inspect</span>
+            </div>
+
+            <div className="flex gap-2 overflow-x-auto pb-1 pt-0.5">
+              {scenes.map((scene, idx) => (
+                <div
+                  key={scene.id}
+                  onClick={() => {
+                    setCurrentSceneIdx(idx);
+                    setIsPlaying(false);
+                  }}
+                  className={`flex-shrink-0 w-52 sm:w-60 rounded-xl overflow-hidden border cursor-pointer transition-all ${
+                    currentSceneIdx === idx
+                      ? 'border-cyan-400 bg-slate-800/90 shadow-lg shadow-cyan-950/40 ring-2 ring-cyan-500/20'
+                      : 'border-slate-800 bg-slate-950/70 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="relative aspect-video bg-slate-900">
+                    <img
+                      src={
+                        scene.previewUrl ||
+                        'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=800&auto=format&fit=crop&q=80'
+                      }
+                      alt={scene.title}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-black/80 text-[10px] font-bold text-cyan-400 flex items-center gap-1">
+                      <span>#{idx + 1}</span>
+                      {scene.speed && scene.speed !== 1 && (
+                        <span className="text-amber-400">({scene.speed}x)</span>
+                      )}
+                    </div>
+                    <div className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded bg-black/80 text-[10px] font-mono text-slate-300">
+                      {scene.durationSeconds || 6}s
+                    </div>
+                    {scene.transition && (
+                      <div className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded bg-purple-950/80 border border-purple-500/40 text-[9px] font-bold text-purple-300 uppercase">
+                        {scene.transition}
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-2 space-y-0.5">
+                    <p className="text-xs font-bold text-white truncate">{scene.title}</p>
+                    <p className="font-urdu text-[11px] text-slate-400 truncate">{scene.urduNarration}</p>
+                  </div>
                 </div>
-                <div className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/70 text-[10px] font-mono text-slate-300">
-                  {scene.durationSeconds || 6}s
+              ))}
+            </div>
+          </div>
+
+          {/* TRACK 2: Voiceover Narration Track */}
+          <div className="space-y-1">
+            <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 px-1">
+              <span className="flex items-center gap-1.5 text-blue-300">
+                <Volume2 className="w-3.5 h-3.5 text-blue-400" />
+                <span>TRACK 2: URDU VOICEOVER (آواز)</span>
+              </span>
+              <span className="text-[10px] text-cyan-400 font-mono">Vol: {Math.round(voiceoverVolume * 100)}%</span>
+            </div>
+
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {scenes.map((scene, idx) => (
+                <div
+                  key={scene.id}
+                  onClick={() => setCurrentSceneIdx(idx)}
+                  className={`flex-shrink-0 w-52 sm:w-60 p-2.5 rounded-xl border cursor-pointer transition-all flex flex-col justify-between ${
+                    currentSceneIdx === idx
+                      ? 'bg-blue-950/40 border-blue-400/60 ring-1 ring-blue-500/30'
+                      : 'bg-slate-950/70 border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center justify-between text-[10px] text-blue-300 mb-1">
+                    <span className="font-mono">S{idx + 1} Voice Cue</span>
+                    <span className="font-mono">{scene.durationSeconds || 6}s</span>
+                  </div>
+                  {/* Waveform graphic bars */}
+                  <div className="flex items-center gap-0.5 h-5 px-1 py-0.5 bg-blue-950/30 rounded border border-blue-500/20 mb-1.5">
+                    {[40, 75, 55, 90, 60, 85, 45, 95, 70, 50, 80, 65, 90, 40].map((h, i) => (
+                      <div
+                        key={i}
+                        className={`flex-1 rounded-sm ${currentSceneIdx === idx ? 'bg-cyan-400' : 'bg-blue-500/60'}`}
+                        style={{ height: `${h}%` }}
+                      />
+                    ))}
+                  </div>
+                  <p className="font-urdu text-[11px] text-slate-300 truncate text-right">
+                    {scene.urduNarration || 'No voiceover script'}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* TRACK 3: Background Music Track with Auto-Ducking */}
+          <div className="space-y-1">
+            <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 px-1">
+              <span className="flex items-center gap-1.5 text-purple-300">
+                <Music className="w-3.5 h-3.5 text-purple-400" />
+                <span>TRACK 3: BACKGROUND SOUNDTRACK</span>
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded-full bg-purple-500/20 border border-purple-500/30 text-purple-300 text-[10px] font-mono flex items-center gap-1">
+                  <Zap className="w-3 h-3 text-amber-400" />
+                  <span>Auto-Ducking Active (-18dB speech)</span>
+                </span>
+                <span className="text-[10px] text-purple-400 font-mono">Vol: {Math.round(bgMusicVolume * 100)}%</span>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-purple-950/20 border border-purple-500/30 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold text-xs">
+                  ♫
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-white">{bgMusic}</p>
+                  <p className="text-[10px] text-purple-300">Royalty-Free Soundtrack • Auto-loops across all {totalDuration}s</p>
                 </div>
               </div>
 
-              <div className="p-3 space-y-1">
-                <p className="text-xs font-bold text-white truncate">{scene.title}</p>
-                <p className="font-urdu text-xs text-slate-300 truncate">{scene.urduNarration}</p>
+              {/* Looping waveform visualization */}
+              <div className="flex-1 max-w-md hidden sm:flex items-center gap-1 h-5 px-2 bg-purple-950/40 rounded-lg border border-purple-500/20">
+                {[20, 30, 45, 60, 50, 75, 40, 30, 65, 80, 55, 35, 45, 60, 70, 50, 40, 80, 65, 50, 35].map((h, i) => (
+                  <div
+                    key={i}
+                    className="flex-1 rounded-sm bg-purple-400/70"
+                    style={{ height: `${h}%` }}
+                  />
+                ))}
               </div>
             </div>
-          ))}
+          </div>
+
+          {/* TRACK 4: SFX & Subtitle Overlay Track */}
+          <div className="space-y-1">
+            <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 px-1">
+              <span className="flex items-center gap-1.5 text-amber-300">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span>TRACK 4: TRANSITION SFX &amp; SUBTITLES</span>
+              </span>
+              <span className="text-[10px] text-amber-400 font-mono">SFX Vol: {Math.round(sfxVolume * 100)}%</span>
+            </div>
+
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {scenes.map((scene, idx) => (
+                <div
+                  key={scene.id}
+                  onClick={() => setCurrentSceneIdx(idx)}
+                  className="flex-shrink-0 w-52 sm:w-60 p-2 rounded-xl bg-slate-950/60 border border-slate-800 text-[10px] flex items-center justify-between cursor-pointer hover:border-slate-700"
+                >
+                  <span className="text-amber-400 font-mono">⚡ Cue S{idx + 1}: {scene.transition || 'cut'}</span>
+                  <span className="text-slate-400 font-mono">{scene.durationSeconds || 6}s</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 

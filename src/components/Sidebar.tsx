@@ -14,15 +14,30 @@ import {
   ChevronRight,
   ExternalLink,
   Zap,
+  Flame,
+  Link2,
+  Wand2,
+  Music2,
+  Radio,
+  Subtitles,
+  Volume2,
 } from 'lucide-react';
 
 export type TabType =
   | 'dashboard'
+  | 'complete_video_maker'
   | 'business_documentary'
   | 'islamic_reels'
+  | 'hook_designer'
   | 'script_writer'
+  | 'script_improver'
+  | 'video_link_analyzer'
   | 'urdu_voice'
+  | 'voice_recorder'
+  | 'music_studio'
+  | 'sfx_studio'
   | 'video_editor'
+  | 'subtitle_studio'
   | 'thumbnail_generator'
   | 'youtube_seo'
   | 'projects'
@@ -35,79 +50,171 @@ interface SidebarProps {
   onCloseMobile: () => void;
 }
 
+interface NavSection {
+  title: string;
+  items: {
+    id: TabType;
+    label: string;
+    icon: any;
+    badge: string | null;
+    badgeColor?: string;
+  }[];
+}
+
 export const Sidebar: React.FC<SidebarProps> = ({
   currentTab,
   onSelectTab,
   isOpen,
   onCloseMobile,
 }) => {
-  const navItems = [
+  const navSections: NavSection[] = [
     {
-      id: 'dashboard' as TabType,
-      label: 'Dashboard',
-      icon: LayoutDashboard,
-      badge: null,
+      title: 'Studio Workspaces',
+      items: [
+        {
+          id: 'dashboard',
+          label: 'Dashboard',
+          icon: LayoutDashboard,
+          badge: null,
+        },
+        {
+          id: 'complete_video_maker',
+          label: 'Complete Video Maker',
+          icon: Sparkles,
+          badge: '12-Step AI',
+          badgeColor: 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30',
+        },
+        {
+          id: 'business_documentary',
+          label: 'Business Documentary',
+          icon: Briefcase,
+          badge: 'PRO',
+          badgeColor: 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30',
+        },
+        {
+          id: 'islamic_reels',
+          label: 'Islamic Reels Studio',
+          icon: Moon,
+          badge: '9:16',
+          badgeColor: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
+        },
+      ],
     },
     {
-      id: 'business_documentary' as TabType,
-      label: 'Business Documentary',
-      icon: Briefcase,
-      badge: 'PRO',
-      badgeColor: 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30',
+      title: 'Creative & Scripting',
+      items: [
+        {
+          id: 'hook_designer',
+          label: 'Hook Designer',
+          icon: Flame,
+          badge: '10 Styles',
+          badgeColor: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
+        },
+        {
+          id: 'script_writer',
+          label: 'AI Script Writer',
+          icon: FileText,
+          badge: 'Urdu/Multi',
+          badgeColor: 'bg-purple-500/20 text-purple-400 border border-purple-500/30',
+        },
+        {
+          id: 'script_improver',
+          label: 'Script Improver & Retention',
+          icon: Wand2,
+          badge: 'CTR',
+          badgeColor: 'bg-pink-500/20 text-pink-400 border border-pink-500/30',
+        },
+        {
+          id: 'video_link_analyzer',
+          label: 'Video Link Analyzer',
+          icon: Link2,
+          badge: 'Viral AI',
+          badgeColor: 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30',
+        },
+      ],
     },
     {
-      id: 'islamic_reels' as TabType,
-      label: 'Islamic Reels Studio',
-      icon: Moon,
-      badge: '9:16',
-      badgeColor: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
+      title: 'Audio & Voice Suite',
+      items: [
+        {
+          id: 'urdu_voice',
+          label: 'Voice Generator Studio',
+          icon: Mic,
+          badge: 'TTS',
+          badgeColor: 'bg-blue-500/20 text-blue-400 border border-blue-500/30',
+        },
+        {
+          id: 'voice_recorder',
+          label: 'Voice Recorder Studio',
+          icon: Radio,
+          badge: 'Live Mic',
+          badgeColor: 'bg-rose-500/20 text-rose-400 border border-rose-500/30',
+        },
+        {
+          id: 'music_studio',
+          label: 'Background Music Studio',
+          icon: Music2,
+          badge: '8 Moods',
+          badgeColor: 'bg-purple-500/20 text-purple-400 border border-purple-500/30',
+        },
+        {
+          id: 'sfx_studio',
+          label: 'Sound Effects Studio',
+          icon: Volume2,
+          badge: 'SFX',
+          badgeColor: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
+        },
+      ],
     },
     {
-      id: 'script_writer' as TabType,
-      label: 'AI Script Writer',
-      icon: FileText,
-      badge: 'Urdu',
-      badgeColor: 'bg-purple-500/20 text-purple-400 border border-purple-500/30',
+      title: 'Editing & Visuals',
+      items: [
+        {
+          id: 'video_editor',
+          label: 'Video Editor & Render',
+          icon: Film,
+          badge: 'Timeline',
+          badgeColor: 'bg-pink-500/20 text-pink-400 border border-pink-500/30',
+        },
+        {
+          id: 'subtitle_studio',
+          label: 'Subtitle Studio',
+          icon: Subtitles,
+          badge: 'SRT/VTT',
+          badgeColor: 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30',
+        },
+        {
+          id: 'thumbnail_generator',
+          label: 'Thumbnail Studio',
+          icon: ImageIcon,
+          badge: '4K',
+          badgeColor: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
+        },
+        {
+          id: 'youtube_seo',
+          label: 'YouTube SEO Tools',
+          icon: TrendingUp,
+          badge: 'Tags',
+          badgeColor: 'bg-rose-500/20 text-rose-400 border border-rose-500/30',
+        },
+      ],
     },
     {
-      id: 'urdu_voice' as TabType,
-      label: 'Urdu Voice Generator',
-      icon: Mic,
-      badge: 'TTS',
-      badgeColor: 'bg-blue-500/20 text-blue-400 border border-blue-500/30',
-    },
-    {
-      id: 'video_editor' as TabType,
-      label: 'Video Editor & Render',
-      icon: Film,
-      badge: 'Render',
-      badgeColor: 'bg-pink-500/20 text-pink-400 border border-pink-500/30',
-    },
-    {
-      id: 'thumbnail_generator' as TabType,
-      label: 'Thumbnail Studio',
-      icon: ImageIcon,
-      badge: '4K',
-      badgeColor: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
-    },
-    {
-      id: 'youtube_seo' as TabType,
-      label: 'YouTube SEO Tools',
-      icon: TrendingUp,
-      badge: 'CTR',
-      badgeColor: 'bg-rose-500/20 text-rose-400 border border-rose-500/30',
-    },
-    {
-      id: 'projects' as TabType,
-      label: 'My Projects',
-      icon: FolderKanban,
-      badge: null,
-    },
-    {
-      id: 'settings' as TabType,
-      label: 'Settings & APIs',
-      icon: Settings,
-      badge: null,
+      title: 'Management',
+      items: [
+        {
+          id: 'projects',
+          label: 'My Projects',
+          icon: FolderKanban,
+          badge: null,
+        },
+        {
+          id: 'settings',
+          label: 'Settings & APIs',
+          icon: Settings,
+          badge: null,
+        },
+      ],
     },
   ];
 
@@ -127,7 +234,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         }`}
       >
         {/* Brand Header */}
-        <div className="p-6 border-b border-slate-800/60 flex items-center justify-between">
+        <div className="p-5 border-b border-slate-800/60 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="relative">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 via-indigo-600 to-purple-600 p-[1.5px] shadow-lg shadow-cyan-500/20">
@@ -146,7 +253,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   NEXORA
                 </span>
                 <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 tracking-widest">
-                  AI
+                  AI v2
                 </span>
               </div>
               <p className="text-[11px] text-slate-400 font-medium">Video Production Studio</p>
@@ -155,51 +262,55 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Navigation List */}
-        <nav className="flex-1 overflow-y-auto px-4 py-5 space-y-1.5">
-          <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-            Workspaces
-          </div>
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = currentTab === item.id;
+        <nav className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+          {navSections.map((sec, secIdx) => (
+            <div key={secIdx} className="space-y-1">
+              <div className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                {sec.title}
+              </div>
+              {sec.items.map((item) => {
+                const Icon = item.icon;
+                const isActive = currentTab === item.id;
 
-            return (
-              <button
-                key={item.id}
-                onClick={() => {
-                  onSelectTab(item.id);
-                  onCloseMobile();
-                }}
-                className={`w-full group flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
-                  isActive
-                    ? 'bg-gradient-to-r from-cyan-500/15 via-indigo-500/10 to-transparent text-cyan-300 border border-cyan-500/30 shadow-lg shadow-cyan-950/40'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div
-                    className={`p-1.5 rounded-lg transition-colors ${
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      onSelectTab(item.id);
+                      onCloseMobile();
+                    }}
+                    className={`w-full group flex items-center justify-between px-3 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 ${
                       isActive
-                        ? 'bg-cyan-500/20 text-cyan-400'
-                        : 'bg-slate-800/50 text-slate-400 group-hover:text-slate-200 group-hover:bg-slate-800'
+                        ? 'bg-gradient-to-r from-cyan-500/15 via-indigo-500/10 to-transparent text-cyan-300 border border-cyan-500/30 shadow-lg shadow-cyan-950/40'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent'
                     }`}
                   >
-                    <Icon className="w-4 h-4" />
-                  </div>
-                  <span className="truncate">{item.label}</span>
-                </div>
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div
+                        className={`p-1.5 rounded-lg transition-colors flex-shrink-0 ${
+                          isActive
+                            ? 'bg-cyan-500/20 text-cyan-400'
+                            : 'bg-slate-800/50 text-slate-400 group-hover:text-slate-200 group-hover:bg-slate-800'
+                        }`}
+                      >
+                        <Icon className="w-4 h-4" />
+                      </div>
+                      <span className="truncate">{item.label}</span>
+                    </div>
 
-                <div className="flex items-center gap-1.5">
-                  {item.badge && (
-                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${item.badgeColor}`}>
-                      {item.badge}
-                    </span>
-                  )}
-                  {isActive && <ChevronRight className="w-4 h-4 text-cyan-400 opacity-80" />}
-                </div>
-              </button>
-            );
-          })}
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {item.badge && (
+                        <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${item.badgeColor || 'bg-slate-800 text-slate-300'}`}>
+                          {item.badge}
+                        </span>
+                      )}
+                      {isActive && <ChevronRight className="w-3.5 h-3.5 text-cyan-400 opacity-80" />}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </nav>
 
         {/* Free First Plan Status Box */}

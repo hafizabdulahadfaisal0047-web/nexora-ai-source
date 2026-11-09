@@ -1,4 +1,13 @@
-import { DocumentaryPlan, IslamicReelPlan, StockVideo } from '../types';
+import {
+  DocumentaryPlan,
+  IslamicReelPlan,
+  StockVideo,
+  HookDesignResult,
+  LinkAnalysisResult,
+  ScriptImprovementResult,
+  RetentionAnalysisResult,
+  VideoLanguage,
+} from '../types';
 
 export interface SystemStatus {
   hasGemini: boolean;
@@ -13,12 +22,12 @@ export async function fetchSystemStatus(): Promise<SystemStatus> {
     const res = await fetch('/api/status');
     if (!res.ok) throw new Error('Status check failed');
     return await res.json();
-  } catch (err) {
+  } catch {
     return {
       hasGemini: false,
       hasPexels: false,
       status: 'offline',
-      version: '1.0.0',
+      version: '2.0.0',
       model: 'gemini-3.8-flash',
     };
   }
@@ -116,13 +125,16 @@ export async function getCuratedVideos(category: string = 'all'): Promise<{ vide
 
 export async function generateSpeechAudio(
   text: string,
-  voiceName: string = 'Kore'
+  voiceName: string = 'Kore',
+  language: string = 'urdu',
+  speed: number = 1.0,
+  style?: string
 ): Promise<{ success: boolean; dataUri?: string; audioBase64?: string; error?: string }> {
   try {
     const res = await fetch('/api/gemini/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, voiceName }),
+      body: JSON.stringify({ text, voiceName, language, speed, style }),
     });
     if (!res.ok) throw new Error('TTS request failed');
     return await res.json();
@@ -131,3 +143,79 @@ export async function generateSpeechAudio(
   }
 }
 
+// 6. Advanced Hook Designer Client
+export async function generateHooks(params: {
+  topic: string;
+  targetAudience?: string;
+  platform?: string;
+  primaryLanguage?: VideoLanguage;
+  videoDuration?: string;
+  tone?: string;
+}): Promise<{ success: boolean; data: HookDesignResult; isFallback?: boolean }> {
+  const res = await fetch('/api/gemini/hooks', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) throw new Error(`Hook generation failed: ${res.statusText}`);
+  return await res.json();
+}
+
+// 7. Script Improver Client
+export async function improveScript(params: {
+  originalText: string;
+  primaryLanguage?: VideoLanguage;
+  goal?: string;
+  targetPacing?: string;
+}): Promise<{ success: boolean; data: ScriptImprovementResult; isFallback?: boolean }> {
+  const res = await fetch('/api/gemini/script-improve', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) throw new Error(`Script improvement failed: ${res.statusText}`);
+  return await res.json();
+}
+
+// 8. Video Link Analyzer Client
+export async function analyzeVideoLink(url: string): Promise<{ success: boolean; data: LinkAnalysisResult; isFallback?: boolean }> {
+  const res = await fetch('/api/gemini/link-analyze', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url }),
+  });
+  if (!res.ok) throw new Error(`Link analysis failed: ${res.statusText}`);
+  return await res.json();
+}
+
+// 9. Retention & Viral Optimizer Client
+export async function analyzeRetention(params: {
+  contentText: string;
+  platform?: string;
+  durationSeconds?: number;
+}): Promise<{ success: boolean; data: RetentionAnalysisResult; isFallback?: boolean }> {
+  const res = await fetch('/api/gemini/retention', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) throw new Error(`Retention analysis failed: ${res.statusText}`);
+  return await res.json();
+}
+
+// 10. Complete Topic-to-Video Workflow Client
+export async function generateTopicToVideo(params: {
+  topic: string;
+  language?: VideoLanguage;
+  aspectRatio?: string;
+  durationMinutes?: number;
+  tone?: string;
+}): Promise<{ success: boolean; data: any; isFallback?: boolean }> {
+  const res = await fetch('/api/gemini/topic-to-video', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) throw new Error(`Topic-to-video failed: ${res.statusText}`);
+  return await res.json();
+}
