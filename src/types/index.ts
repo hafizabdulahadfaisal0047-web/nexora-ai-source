@@ -59,6 +59,8 @@ export interface TimelineHealthIssue {
 
 export interface TimelineHealthReport {
   overallScore: number; // 0 - 100
+  score?: number;
+  healthy?: boolean;
   status: 'optimal' | 'warnings' | 'needs_fix';
   issues: TimelineHealthIssue[];
   totalDeadSilenceSeconds: number;
@@ -295,4 +297,114 @@ export interface Project {
     hashtags?: string[];
   };
   scriptData?: any;
+}
+
+// Multi-Provider Architecture Types
+export type LLMProviderType = 'gemini' | 'openai_compatible' | 'groq' | 'custom';
+export type VoiceProviderType = 'web_speech' | 'edge_tts' | 'gemini_tts';
+export type ImageProviderType = 'gemini_image' | 'pollinations' | 'unsplash';
+export type MediaProviderType = 'pexels' | 'pixabay' | 'curated' | 'user_upload';
+
+export interface ProviderConfig {
+  activeLLM: LLMProviderType;
+  activeVoice: VoiceProviderType;
+  activeImage: ImageProviderType;
+  activeMedia: MediaProviderType;
+  autoFallbackEnabled: boolean;
+  maxRetries: number;
+  customApiUrl?: string;
+  pixabayApiKey?: string;
+  pexelsApiKey?: string;
+  groqApiKey?: string;
+  openaiApiKey?: string;
+}
+
+// Content Engine & Calendar Types
+export type ContentNiche =
+  | 'business_documentaries'
+  | 'business_success_stories'
+  | 'money_lessons'
+  | 'islamic_educational'
+  | 'motivational'
+  | 'historical_documentaries'
+  | 'educational_explainers'
+  | 'viral_storytelling';
+
+export interface TopicIdea {
+  id: string;
+  title: string;
+  titleUrdu: string;
+  niche: ContentNiche;
+  viralHookAngle: string;
+  targetAudience: string;
+  estimatedDuration: string;
+  keyConflict: string;
+  viralityScore: number; // 1 - 100
+  similarityScore?: number; // 0 - 100
+  tags: string[];
+  dateGenerated: string;
+}
+
+export type ContentStatus = 'idea' | 'scripted' | 'recorded' | 'rendered' | 'published';
+
+export interface ContentCalendarItem {
+  id: string;
+  date: string; // YYYY-MM-DD
+  title: string;
+  niche: ContentNiche;
+  platform: 'youtube_long' | 'youtube_shorts' | 'instagram_reels';
+  status: ContentStatus;
+  primaryLanguage: VideoLanguage;
+  scriptSnippet?: string;
+  projectId?: string;
+  notes?: string;
+}
+
+export interface SavedScriptItem {
+  id: string;
+  title: string;
+  niche: ContentNiche;
+  primaryLanguage: VideoLanguage;
+  alternativeHooks: [string, string, string]; // 3 alternative hooks mandate
+  fullScript: string;
+  scenesCount: number;
+  wordCount: number;
+  targetDurationSeconds: number;
+  createdAt: string;
+  tags: string[];
+}
+
+export interface DuplicateAuditResult {
+  isDuplicate: boolean;
+  similarityScore: number; // 0 - 100
+  status: 'unique' | 'borderline' | 'duplicate';
+  message: string;
+  matchedTopic?: string;
+  suggestedUniqueAngle?: string;
+}
+
+export interface BulkContentPlan {
+  batchId: string;
+  niche: ContentNiche;
+  theme: string;
+  plans: {
+    day: string;
+    topic: string;
+    hookIdea: string;
+    format: '16:9 Documentary' | '9:16 Short/Reel';
+    estimatedMinutes: number;
+  }[];
+}
+
+// Background Job Queue Types
+export interface BackgroundJob {
+  id: string;
+  taskType: 'script_generation' | 'bulk_planning' | 'video_render' | 'retention_audit';
+  status: 'queued' | 'processing' | 'completed' | 'failed';
+  progress: number; // 0 - 100
+  createdAt: string;
+  completedAt?: string;
+  payload?: any;
+  result?: any;
+  error?: string;
 }

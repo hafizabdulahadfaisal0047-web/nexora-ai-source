@@ -148,8 +148,8 @@ export class VideoRenderer {
           sceneVoiceBuffers.push(res.buffer);
 
           // If auto-sync is active and speech exists, snap scene duration to spoken audio + 450ms natural transition cadence
-          if (autoSyncSpeechGaps && res.durationSeconds > 0) {
-            const syncedDur = Math.max(2.5, Math.round((res.durationSeconds + 0.45) * 10) / 10);
+          if (autoSyncSpeechGaps && res.exactDurationSeconds > 0) {
+            const syncedDur = Math.max(2.5, Math.round((res.exactDurationSeconds + 0.45) * 10) / 10);
             sceneEffectiveDurations.push(syncedDur);
           } else {
             sceneEffectiveDurations.push(configuredDur);

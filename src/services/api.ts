@@ -219,3 +219,119 @@ export async function generateTopicToVideo(params: {
   if (!res.ok) throw new Error(`Topic-to-video failed: ${res.statusText}`);
   return await res.json();
 }
+
+// 11. Pixabay Stock Video Search Client
+export async function searchPixabayVideos(
+  query: string,
+  perPage: number = 10,
+  customPixabayKey?: string
+): Promise<{ videos: StockVideo[]; source: string; note?: string }> {
+  const headers: Record<string, string> = {};
+  if (customPixabayKey) {
+    headers['x-pixabay-key'] = customPixabayKey;
+  }
+  const url = `/api/pixabay/videos?query=${encodeURIComponent(query)}&per_page=${perPage}`;
+  const res = await fetch(url, { headers });
+  if (!res.ok) throw new Error(`Pixabay search failed: ${res.statusText}`);
+  return await res.json();
+}
+
+// 12. Provider Settings API
+export async function fetchProviderSettings(): Promise<{ success: boolean; providers: any }> {
+  const res = await fetch('/api/settings/providers');
+  if (!res.ok) throw new Error('Failed to load provider settings');
+  return await res.json();
+}
+
+export async function updateProviderSettings(config: any): Promise<{ success: boolean; providers: any; message: string }> {
+  const res = await fetch('/api/settings/providers', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(config),
+  });
+  if (!res.ok) throw new Error('Failed to update provider settings');
+  return await res.json();
+}
+
+// 13. System API Usage & Quotas
+export async function fetchSystemUsage(): Promise<{ success: boolean; stats: any; activeProviders: any; quotaHealth: any }> {
+  const res = await fetch('/api/system/usage');
+  if (!res.ok) throw new Error('Failed to fetch system usage stats');
+  return await res.json();
+}
+
+// 14. Content Generation Engine Client
+export async function fetchContentTopics(
+  niche: string = 'business_documentaries',
+  count: number = 8,
+  language: string = 'urdu'
+): Promise<{ success: boolean; topics: any[]; isFallback?: boolean }> {
+  const res = await fetch('/api/content/topics', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ niche, count, language }),
+  });
+  if (!res.ok) throw new Error('Failed to generate content topics');
+  return await res.json();
+}
+
+export async function fetchDailyIdeas(): Promise<{ success: boolean; date: string; ideas: any[] }> {
+  const res = await fetch('/api/content/daily-ideas');
+  if (!res.ok) throw new Error('Failed to load daily ideas');
+  return await res.json();
+}
+
+export async function checkTopicDuplicate(topic: string): Promise<{
+  success: boolean;
+  topic: string;
+  isDuplicate: boolean;
+  similarityScore: number;
+  status: 'unique' | 'borderline' | 'duplicate';
+  message: string;
+  matchedTopic?: string;
+}> {
+  const res = await fetch('/api/content/check-duplicate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ topic }),
+  });
+  if (!res.ok) throw new Error('Failed to check duplicate topic');
+  return await res.json();
+}
+
+export async function generateBulkPlan(
+  niche: string = 'business_documentaries',
+  theme: string = 'Market Titans & Unseen Disruptions',
+  language: string = 'urdu'
+): Promise<{ success: boolean; plan: any; isFallback?: boolean }> {
+  const res = await fetch('/api/content/bulk-plan', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ niche, theme, language }),
+  });
+  if (!res.ok) throw new Error('Failed to generate bulk plan');
+  return await res.json();
+}
+
+// 15. Background Job Queue Client
+export async function createBackgroundJob(taskType: string, payload?: any): Promise<{ success: boolean; job: any }> {
+  const res = await fetch('/api/jobs/create', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ taskType, payload }),
+  });
+  if (!res.ok) throw new Error('Failed to create background job');
+  return await res.json();
+}
+
+export async function fetchBackgroundJob(id: string): Promise<{ success: boolean; job: any }> {
+  const res = await fetch(`/api/jobs/${id}`);
+  if (!res.ok) throw new Error('Failed to fetch job status');
+  return await res.json();
+}
+
+export async function listBackgroundJobs(): Promise<{ success: boolean; jobs: any[] }> {
+  const res = await fetch('/api/jobs');
+  if (!res.ok) throw new Error('Failed to list background jobs');
+  return await res.json();
+}

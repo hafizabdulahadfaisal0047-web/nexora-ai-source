@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Film,
   Play,
@@ -217,6 +217,10 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
   // Timeline Health & Timing Synchronization State
   const [showHealthModal, setShowHealthModal] = useState(false);
   const [autoSyncFeedback, setAutoSyncFeedback] = useState<string | null>(null);
+
+  const healthReport = useMemo(() => {
+    return auditTimelineHealth(scenes, 'urdu', 1.0);
+  }, [scenes]);
 
   useEffect(() => {
     if (currentProject) {
@@ -1166,6 +1170,49 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
               </div>
             </div>
 
+            {/* Cinematic Color Grading & Ken Burns Camera Motion */}
+            <div className="grid grid-cols-2 gap-2.5">
+              <div>
+                <label className="block text-[10px] font-semibold text-purple-400 mb-1 flex items-center gap-1">
+                  <Palette className="w-3 h-3" />
+                  <span>COLOR GRADE</span>
+                </label>
+                <select
+                  value={activeScene?.colorGrade || 'documentary_cold'}
+                  onChange={(e) =>
+                    handleSceneColorGradeChange(currentSceneIdx, e.target.value as Scene['colorGrade'])
+                  }
+                  className="w-full px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-purple-300 outline-none"
+                >
+                  <option value="documentary_cold">Documentary Cold</option>
+                  <option value="warm_cinematic">Warm Hollywood Gold</option>
+                  <option value="cyberpunk_glow">Cyberpunk Neon</option>
+                  <option value="spiritual_soft">Spiritual Golden</option>
+                  <option value="natural_crisp">Natural 1080p Crisp</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-semibold text-cyan-400 mb-1 flex items-center gap-1">
+                  <Wand2 className="w-3 h-3" />
+                  <span>KEN BURNS MOTION</span>
+                </label>
+                <select
+                  value={activeScene?.kenBurnsEffect || 'zoom_in'}
+                  onChange={(e) =>
+                    handleSceneKenBurnsChange(currentSceneIdx, e.target.value as Scene['kenBurnsEffect'])
+                  }
+                  className="w-full px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-cyan-300 outline-none"
+                >
+                  <option value="zoom_in">Slow Push-In (Zoom In)</option>
+                  <option value="zoom_out">Slow Reveal (Zoom Out)</option>
+                  <option value="pan_right">Cinematic Pan Right</option>
+                  <option value="pan_left">Cinematic Pan Left</option>
+                  <option value="static">Locked Static Frame</option>
+                </select>
+              </div>
+            </div>
+
             {/* Visual Media Selection */}
             <div>
               <label className="block text-[11px] font-semibold text-slate-400 mb-1.5">
@@ -1257,7 +1304,40 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
           </div>
 
           {/* Quick Scene Operations */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Timeline Health Inspector Button */}
+            <button
+              onClick={() => setShowHealthModal(true)}
+              className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all ${
+                healthReport.healthy
+                  ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                  : 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border-amber-500/40 animate-pulse'
+              }`}
+              title="Audit timeline synchronization, silent gaps and duplicate footage"
+            >
+              {healthReport.healthy ? (
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              ) : (
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+              )}
+              <span>{healthReport.score}% Health</span>
+              {healthReport.issues.length > 0 && (
+                <span className="w-4 h-4 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black flex items-center justify-center">
+                  {healthReport.issues.length}
+                </span>
+              )}
+            </button>
+
+            {/* 1-Click Auto-Sync All Scenes to Speech */}
+            <button
+              onClick={handleAutoSyncAllGaps}
+              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500/20 to-blue-500/20 hover:from-cyan-500/30 hover:to-blue-500/30 text-cyan-300 border border-cyan-500/40 text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm"
+              title="Automatically calculate speech durations and trim all silent dead gaps"
+            >
+              <Zap className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Auto-Sync &amp; Trim Gaps</span>
+            </button>
+
             <button
               onClick={() => handleSplitScene(currentSceneIdx)}
               className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-all"
@@ -1285,6 +1365,22 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Auto-Sync Feedback Banner */}
+        {autoSyncFeedback && (
+          <div className="p-3 rounded-xl bg-cyan-950/60 border border-cyan-500/40 text-xs text-cyan-200 flex items-center justify-between">
+            <span className="flex items-center gap-2 font-medium">
+              <Sparkles className="w-4 h-4 text-cyan-400 animate-spin" />
+              {autoSyncFeedback}
+            </span>
+            <button
+              onClick={() => setAutoSyncFeedback(null)}
+              className="text-cyan-400 hover:text-white font-bold ml-2 text-base"
+            >
+              ×
+            </button>
+          </div>
+        )}
 
         {/* Multi-Track Stack */}
         <div className="space-y-2.5">
@@ -1642,6 +1738,146 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
                   </div>
                 ))
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Timeline Health Inspector Modal */}
+      {showHealthModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#0b0f19] border border-cyan-500/30 rounded-3xl max-w-2xl w-full p-6 sm:p-8 space-y-6 shadow-2xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-lg ${
+                    healthReport.healthy
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                      : 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
+                  }`}
+                >
+                  {healthReport.score}%
+                </div>
+                <div>
+                  <h3 className="text-lg font-extrabold text-white">Timeline Health Inspector</h3>
+                  <p className="text-xs text-slate-400">
+                    Pre-export timing verification &amp; audio synchronization audit
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowHealthModal(false)}
+                className="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center text-sm font-bold"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Health Metrics Quick Bar */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+                <span className="text-[10px] text-slate-400 font-bold block uppercase">Total Scenes</span>
+                <span className="text-base font-extrabold text-white font-mono">{scenes.length}</span>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+                <span className="text-[10px] text-slate-400 font-bold block uppercase">Video Duration</span>
+                <span className="text-base font-extrabold text-cyan-300 font-mono">{healthReport.totalVideoDurationSeconds}s</span>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+                <span className="text-[10px] text-slate-400 font-bold block uppercase">Estimated Voice</span>
+                <span className="text-base font-extrabold text-purple-300 font-mono">{healthReport.totalAudioDurationSeconds.toFixed(1)}s</span>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+                <span className="text-[10px] text-slate-400 font-bold block uppercase">Dead Silence Gaps</span>
+                <span className={`text-base font-extrabold font-mono ${healthReport.totalDeadSilenceSeconds > 1 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                  {healthReport.totalDeadSilenceSeconds.toFixed(1)}s
+                </span>
+              </div>
+            </div>
+
+            {/* Issues List */}
+            <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
+              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                Audit Diagnostics ({healthReport.issues.length} Items)
+              </h4>
+
+              {healthReport.issues.length === 0 ? (
+                <div className="p-6 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-center space-y-1.5">
+                  <ShieldCheck className="w-8 h-8 text-emerald-400 mx-auto" />
+                  <p className="text-sm font-bold text-emerald-300">Timeline is 100% Synchronized</p>
+                  <p className="text-xs text-slate-400">
+                    No black screens, silent gaps, or audio overruns found. Ready for high-fidelity export!
+                  </p>
+                </div>
+              ) : (
+                healthReport.issues.map((issue) => (
+                  <div
+                    key={issue.id}
+                    className={`p-3.5 rounded-xl border flex items-start gap-3 ${
+                      issue.severity === 'error'
+                        ? 'bg-rose-950/20 border-rose-500/30 text-rose-200'
+                        : issue.severity === 'warning'
+                        ? 'bg-amber-950/20 border-amber-500/30 text-amber-200'
+                        : 'bg-slate-900/80 border-slate-800 text-slate-300'
+                    }`}
+                  >
+                    <div className="mt-0.5 flex-shrink-0">
+                      {issue.severity === 'error' ? (
+                        <AlertTriangle className="w-4 h-4 text-rose-400" />
+                      ) : issue.severity === 'warning' ? (
+                        <AlertTriangle className="w-4 h-4 text-amber-400" />
+                      ) : (
+                        <Activity className="w-4 h-4 text-cyan-400" />
+                      )}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded uppercase font-bold bg-slate-800 text-white">
+                          Scene {issue.sceneIndex + 1}
+                        </span>
+                        <span className="text-[11px] font-bold uppercase tracking-wider opacity-80">
+                          {issue.type.replace('_', ' ')}
+                        </span>
+                      </div>
+                      <p className="text-xs leading-relaxed">{issue.message}</p>
+                      {issue.suggestedDurationSeconds && (
+                        <p className="text-[11px] text-cyan-300 font-mono mt-1">
+                          Suggested trim: {issue.suggestedDurationSeconds}s
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Modal Actions */}
+            <div className="pt-3 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <span className="text-xs text-slate-400">
+                Auto-sync recalculates every scene to match speech duration + natural cadence.
+              </span>
+
+              <div className="flex items-center gap-2.5 w-full sm:w-auto">
+                <button
+                  onClick={() => setShowHealthModal(false)}
+                  className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
+                >
+                  Dismiss
+                </button>
+
+                <button
+                  onClick={() => {
+                    handleAutoSyncAllGaps();
+                    setShowHealthModal(false);
+                  }}
+                  className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-cyan-950/60"
+                >
+                  <Zap className="w-4 h-4" />
+                  <span>⚡ 1-Click Fix &amp; Trim All Gaps</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

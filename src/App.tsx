@@ -19,6 +19,7 @@ import { MusicStudio } from './components/MusicStudio';
 import { SoundEffectsStudio } from './components/SoundEffectsStudio';
 import { SubtitleStudio } from './components/SubtitleStudio';
 import { VoiceRecorderStudio } from './components/VoiceRecorderStudio';
+import { ContentEngineStudio } from './components/ContentEngineStudio';
 import { Project } from './types';
 import { ProjectStore } from './services/projectStore';
 import { fetchSystemStatus, SystemStatus } from './services/api';
@@ -130,6 +131,27 @@ export default function App() {
                 setCurrentTab('video_editor');
               }}
               onNewProject={handleQuickNewProject}
+            />
+          )}
+
+          {currentTab === 'content_engine' && (
+            <ContentEngineStudio
+              onSendToScriptWriter={(topic: string) => {
+                setSharedTopic(topic);
+                setCurrentTab('script_writer');
+              }}
+              onSendToDocumentary={(topic: string) => {
+                setSharedTopic(topic);
+                setCurrentTab('business_documentary');
+              }}
+              onSendToReels={(topic: string) => {
+                setSharedTopic(topic);
+                setCurrentTab('islamic_reels');
+              }}
+              onSendToHookDesigner={(topic: string) => {
+                setSharedTopic(topic);
+                setCurrentTab('hook_designer');
+              }}
             />
           )}
 

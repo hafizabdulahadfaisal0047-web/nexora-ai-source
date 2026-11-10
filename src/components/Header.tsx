@@ -24,6 +24,10 @@ const TAB_TITLES: Record<TabType, { title: string; subtitle: string }> = {
     title: 'Command Dashboard',
     subtitle: 'Real-time metrics, quick AI workflows & project library',
   },
+  content_engine: {
+    title: 'Content Strategy & Topic Radar',
+    subtitle: '8-niche topic mining, daily viral prompts, duplicate auditing & 7-day calendar',
+  },
   complete_video_maker: {
     title: 'Complete Video Maker Studio',
     subtitle: '12-Step automated AI pipeline from topic to final MP4 video',

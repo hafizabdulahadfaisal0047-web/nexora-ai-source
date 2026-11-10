@@ -21,10 +21,12 @@ import {
   Radio,
   Subtitles,
   Volume2,
+  Compass,
 } from 'lucide-react';
 
 export type TabType =
   | 'dashboard'
+  | 'content_engine'
   | 'complete_video_maker'
   | 'business_documentary'
   | 'islamic_reels'
@@ -76,6 +78,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           label: 'Dashboard',
           icon: LayoutDashboard,
           badge: null,
+        },
+        {
+          id: 'content_engine',
+          label: 'Content Engine & Topics',
+          icon: Compass,
+          badge: '8 Niches',
+          badgeColor: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
         },
         {
           id: 'complete_video_maker',

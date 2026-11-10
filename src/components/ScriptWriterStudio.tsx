@@ -34,6 +34,7 @@ export const ScriptWriterStudio: React.FC<ScriptWriterStudioProps> = ({
   const [tone, setTone] = useState('engaging, investigative and authoritative');
   const [loading, setLoading] = useState(false);
   const [scriptData, setScriptData] = useState<any | null>(null);
+  const [selectedHookIdx, setSelectedHookIdx] = useState<number>(0);
   const [copied, setCopied] = useState(false);
 
   React.useEffect(() => {
@@ -42,11 +43,20 @@ export const ScriptWriterStudio: React.FC<ScriptWriterStudioProps> = ({
     }
   }, [initialTopic]);
 
+  const activeHookText = React.useMemo(() => {
+    if (!scriptData) return initialHook || '';
+    if (scriptData.alternativeHooks && scriptData.alternativeHooks[selectedHookIdx]) {
+      return scriptData.alternativeHooks[selectedHookIdx].text;
+    }
+    return scriptData.hook || initialHook || '';
+  }, [scriptData, selectedHookIdx, initialHook]);
+
   const handleGenerate = async (targetTopic?: string) => {
     const query = targetTopic || topic;
     if (!query.trim()) return;
 
     setLoading(true);
+    setSelectedHookIdx(0);
     try {
       const res = await generateScript(query, format, language, tone);
       setScriptData(res.data);
@@ -59,11 +69,11 @@ export const ScriptWriterStudio: React.FC<ScriptWriterStudioProps> = ({
 
   const handleCopyFullScript = () => {
     if (!scriptData) return;
-    const fullText = `${scriptData.title}\n\n[HOOK]\n${scriptData.hook}\n\n[INTRODUCTION]\n${
+    const fullText = `${scriptData.title}\n\n[SELECTED HOOK]\n${activeHookText}\n\n[INTRODUCTION]\n${
       scriptData.introduction
     }\n\n${scriptData.bodySections
-      ?.map((s: any) => `[${s.heading}]\n${s.content}\n(Visual Cue: ${s.visualCue})`)
-      .join('\n\n')}\n\n[CONCLUSION]\n${scriptData.conclusion}`;
+      ?.map((s: any) => `[${s.heading}]\n${s.content}\n${s.transitionPhrase ? `(Transition: ${s.transitionPhrase})\n` : ''}(Visual Cue: ${s.visualCue})`)
+      .join('\n\n')}\n\n[CONCLUSION]\n${scriptData.conclusion}\n\n[CALL TO ACTION]\n${scriptData.callToAction || ''}\n\n[FACT & SOURCE REFERENCES]\n${scriptData.factReferences?.join('\n') || ''}`;
 
     navigator.clipboard.writeText(fullText);
     setCopied(true);
@@ -72,6 +82,48 @@ export const ScriptWriterStudio: React.FC<ScriptWriterStudioProps> = ({
 
   const handleCreateProjectFromScript = () => {
     if (!scriptData) return;
+
+    // Build scene array starting with the selected hook
+    const scenes: any[] = [];
+
+    // Scene 0: Hook Scene
+    if (activeHookText) {
+      scenes.push({
+        id: `sc_hook_${Date.now()}`,
+        sceneNumber: 1,
+        title: 'Hook / Opening (0-5s)',
+        visualDescription: 'Dramatic high-contrast visual with dynamic punch',
+        stockSearchQuery: `${topic} dramatic cinema`,
+        videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+        previewUrl: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&auto=format&fit=crop&q=80',
+        urduNarration: activeHookText,
+        englishSubtitle: 'Opening hook',
+        durationSeconds: 5,
+        transition: 'zoom',
+        colorGrade: 'documentary_cold',
+        kenBurnsEffect: 'zoom_in',
+      });
+    }
+
+    // Body scenes
+    scriptData.bodySections?.forEach((sec: any, idx: number) => {
+      scenes.push({
+        id: `sc_sec_${idx}`,
+        sceneNumber: scenes.length + 1,
+        title: sec.heading || `Chapter ${idx + 1}`,
+        visualDescription: sec.visualCue || 'Modern cinematic visual',
+        stockSearchQuery: `${topic} chapter ${idx + 1}`,
+        videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+        previewUrl: 'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=800&auto=format&fit=crop&q=80',
+        urduNarration: sec.content || '',
+        englishSubtitle: '',
+        durationSeconds: 8,
+        transition: 'fade',
+        colorGrade: 'documentary_cold',
+        kenBurnsEffect: idx % 2 === 0 ? 'zoom_in' : 'pan_right',
+      });
+    });
+
     const project: Project = {
       id: `script_proj_${Date.now()}`,
       title: scriptData.title || topic || 'Script Project',
@@ -80,20 +132,8 @@ export const ScriptWriterStudio: React.FC<ScriptWriterStudioProps> = ({
       updatedAt: new Date().toISOString(),
       aspectRatio: format === 'reel' ? '9:16' : '16:9',
       resolution: '1080p',
-      scenes: scriptData.bodySections?.map((sec: any, idx: number) => ({
-        id: `sc_sec_${idx}`,
-        sceneNumber: idx + 1,
-        title: sec.heading || `Scene ${idx + 1}`,
-        visualDescription: sec.visualCue || 'Modern cinematic visual',
-        stockSearchQuery: 'business technology modern',
-        videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-        previewUrl: 'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=800&auto=format&fit=crop&q=80',
-        urduNarration: sec.content || '',
-        englishSubtitle: '',
-        durationSeconds: 10,
-        transition: 'fade',
-      })) || [],
-      scriptData,
+      scenes,
+      scriptData: { ...scriptData, selectedHook: activeHookText },
     };
 
     onLoadIntoEditor(project);
@@ -235,14 +275,62 @@ export const ScriptWriterStudio: React.FC<ScriptWriterStudioProps> = ({
             </div>
           </div>
 
-          {/* Hook Box */}
-          <div className="p-6 rounded-2xl bg-[#130d22] border border-purple-500/30 space-y-2">
-            <span className="text-xs font-bold text-purple-400 uppercase">
-              HOOK (پہلے 10 سیکنڈز کی کشش)
-            </span>
-            <p className="font-urdu text-lg sm:text-xl text-white leading-loose font-semibold">
-              {scriptData.hook}
-            </p>
+          {/* Hook Selector Box */}
+          <div className="p-6 rounded-2xl bg-[#130d22] border border-purple-500/30 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-purple-500/20 pb-3">
+              <span className="text-xs font-bold text-purple-400 uppercase flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                <span>3 High-Retention Alternative Hooks (پہلے 10 سیکنڈز کی کشش)</span>
+              </span>
+              <span className="text-[11px] text-slate-400">
+                Click a hook style to make it the active script opening
+              </span>
+            </div>
+
+            {/* Hook Selector Pills */}
+            {scriptData.alternativeHooks && scriptData.alternativeHooks.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                {scriptData.alternativeHooks.map((h: any, idx: number) => {
+                  const isSelected = selectedHookIdx === idx;
+                  const label =
+                    h.type === 'curiosity_high_stakes'
+                      ? '⚡ High-Stakes Curiosity'
+                      : h.type === 'mystery_question'
+                      ? '❓ Mystery Question'
+                      : '❄️ Cold Revelation';
+
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => setSelectedHookIdx(idx)}
+                      className={`p-3 rounded-xl text-left border transition-all ${
+                        isSelected
+                          ? 'bg-purple-900/40 border-purple-400 text-white shadow-md shadow-purple-950/60'
+                          : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between text-[11px] font-bold mb-1">
+                        <span className={isSelected ? 'text-purple-300' : 'text-slate-400'}>
+                          {label}
+                        </span>
+                        {isSelected && <Check className="w-3.5 h-3.5 text-purple-400" />}
+                      </div>
+                      <p className="text-xs line-clamp-2 text-slate-300 font-urdu">{h.text}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Active Hook Full Preview */}
+            <div className="p-4 rounded-xl bg-slate-950/70 border border-purple-500/30">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-purple-400 mb-1 block">
+                ACTIVE OPENING HOOK (0-5s)
+              </span>
+              <p className="font-urdu text-lg sm:text-xl text-white leading-loose font-semibold">
+                {activeHookText}
+              </p>
+            </div>
           </div>
 
           {/* Introduction Box */}
@@ -257,8 +345,11 @@ export const ScriptWriterStudio: React.FC<ScriptWriterStudioProps> = ({
 
           {/* Body Sections */}
           <div className="space-y-4">
-            <h4 className="text-base font-bold text-white tracking-tight">
-              Chapters &amp; Story Timeline
+            <h4 className="text-base font-bold text-white tracking-tight flex items-center justify-between">
+              <span>Chapters &amp; Story Timeline</span>
+              <span className="text-xs font-normal text-slate-400">
+                Smooth bridge transitions between core ideas
+              </span>
             </h4>
             <div className="space-y-4">
               {scriptData.bodySections?.map((section: any, idx: number) => (
@@ -279,6 +370,16 @@ export const ScriptWriterStudio: React.FC<ScriptWriterStudioProps> = ({
                   <p className="font-urdu text-base sm:text-lg text-white leading-loose">
                     {section.content}
                   </p>
+                  {section.transitionPhrase && (
+                    <div className="pt-2 border-t border-slate-800/40 flex items-center gap-2 text-xs text-indigo-300">
+                      <span className="text-[10px] px-2 py-0.5 rounded-md bg-indigo-950/60 border border-indigo-700/40 uppercase font-mono font-bold">
+                        Transition
+                      </span>
+                      <span className="font-urdu italic text-slate-300">
+                        "{section.transitionPhrase}"
+                      </span>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -287,12 +388,43 @@ export const ScriptWriterStudio: React.FC<ScriptWriterStudioProps> = ({
           {/* Conclusion Box */}
           <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-2">
             <span className="text-xs font-bold text-emerald-400 uppercase">
-              CONCLUSION &amp; CALL TO ACTION (نتیجہ اور کال ٹو ایکشن)
+              CONCLUSION (نتیجہ اور مرکزی سبق)
             </span>
             <p className="font-urdu text-base text-slate-200 leading-loose">
               {scriptData.conclusion}
             </p>
           </div>
+
+          {/* Call to Action Box */}
+          {scriptData.callToAction && (
+            <div className="p-5 rounded-2xl bg-gradient-to-r from-cyan-950/40 to-slate-900 border border-cyan-500/30 space-y-2">
+              <span className="text-xs font-bold text-cyan-400 uppercase flex items-center gap-1.5">
+                <ArrowRight className="w-3.5 h-3.5" />
+                <span>STRONG CHANNEL CALL TO ACTION (سبسکرائب اور فالو کی ترغیب)</span>
+              </span>
+              <p className="font-urdu text-sm sm:text-base text-slate-200 leading-relaxed">
+                {scriptData.callToAction}
+              </p>
+            </div>
+          )}
+
+          {/* Fact References & Grounding */}
+          {scriptData.factReferences && scriptData.factReferences.length > 0 && (
+            <div className="p-5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2.5">
+              <span className="text-xs font-bold text-amber-400 uppercase flex items-center gap-1.5">
+                <BookOpen className="w-3.5 h-3.5" />
+                <span>ACCURATE FACTS &amp; SOURCES REFERENCES (مستند حقائق اور حوالہ جات)</span>
+              </span>
+              <ul className="space-y-1.5 text-xs text-slate-300">
+                {scriptData.factReferences.map((fact: string, fIdx: number) => (
+                  <li key={fIdx} className="flex items-start gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5 flex-shrink-0" />
+                    <span>{fact}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
     </div>

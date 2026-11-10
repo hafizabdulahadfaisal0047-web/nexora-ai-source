@@ -1179,6 +1179,8 @@ export function auditTimelineHealth(
 
   return {
     overallScore,
+    score: overallScore,
+    healthy: overallScore >= 85,
     status,
     issues,
     totalDeadSilenceSeconds: Math.round(totalDeadSilenceSeconds * 10) / 10,
