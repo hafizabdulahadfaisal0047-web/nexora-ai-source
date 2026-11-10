@@ -37,12 +37,35 @@ export interface Scene {
   isCustomUpload?: boolean;
   speed?: number; // 0.5x, 1x, 1.5x, etc.
   zoomLevel?: number; // 1.0 = normal, 1.2 = zoom
+  audioDurationSeconds?: number; // Calculated / measured spoken audio duration
+  colorGrade?: 'documentary_cold' | 'warm_cinematic' | 'cyberpunk_glow' | 'spiritual_soft' | 'natural_crisp';
+  kenBurnsEffect?: 'pan_right' | 'pan_left' | 'zoom_in' | 'zoom_out' | 'static';
   textOverlay?: {
     text: string;
     position: 'top' | 'center' | 'bottom';
     color: string;
     backgroundColor?: string;
   };
+}
+
+export interface TimelineHealthIssue {
+  id: string;
+  sceneIndex: number;
+  type: 'silent_gap' | 'audio_overrun' | 'missing_media' | 'duplicate_clip' | 'missing_narration' | 'pacing_warning';
+  severity: 'error' | 'warning' | 'info';
+  message: string;
+  suggestedDurationSeconds?: number;
+}
+
+export interface TimelineHealthReport {
+  overallScore: number; // 0 - 100
+  status: 'optimal' | 'warnings' | 'needs_fix';
+  issues: TimelineHealthIssue[];
+  totalDeadSilenceSeconds: number;
+  totalAudioDurationSeconds: number;
+  totalVideoDurationSeconds: number;
+  duplicateClipsCount: number;
+  missingMediaCount: number;
 }
 
 export interface DocumentaryPlan {

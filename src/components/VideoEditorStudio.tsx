@@ -32,13 +32,23 @@ import {
   Volume1,
   Activity,
   Zap,
+  AlertTriangle,
+  ShieldCheck,
+  Wand2,
+  Palette,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { AspectRatio, Project, Resolution, Scene, StockVideo, TransitionType } from '../types';
 import { VideoRenderer, RenderResult, downloadVideoFile } from '../services/videoRenderer';
 import { getCuratedVideos, searchStockVideos } from '../services/api';
 import { UrduVoiceService } from '../services/audioSynthesizer';
-import { generateSoundtrackBuffer, ROYALTY_FREE_SOUNDTRACKS } from '../services/audioEngine';
+import {
+  generateSoundtrackBuffer,
+  ROYALTY_FREE_SOUNDTRACKS,
+  auditTimelineHealth,
+  autoSyncAllScenesToSpeech,
+  estimateSentenceSpeechDuration,
+} from '../services/audioEngine';
 
 interface VideoEditorStudioProps {
   currentProject: Project | null;
@@ -203,6 +213,10 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
   const [renderStatus, setRenderStatus] = useState('');
   const [renderResult, setRenderResult] = useState<RenderResult | null>(null);
   const rendererRef = useRef<VideoRenderer | null>(null);
+
+  // Timeline Health & Timing Synchronization State
+  const [showHealthModal, setShowHealthModal] = useState(false);
+  const [autoSyncFeedback, setAutoSyncFeedback] = useState<string | null>(null);
 
   useEffect(() => {
     if (currentProject) {
@@ -382,8 +396,17 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
 
   const handleTimeUpdate = () => {
     if (videoPlayerRef.current) {
+      const sceneElapsed = videoPlayerRef.current.currentTime;
+      const targetDuration = activeScene?.durationSeconds || 5;
       const preceding = getPrecedingDuration(currentSceneIdx);
-      setCurrentTime(preceding + videoPlayerRef.current.currentTime);
+
+      setCurrentTime(preceding + Math.min(sceneElapsed, targetDuration));
+
+      // Advance immediately to next scene when targetDuration is reached
+      // This eliminates awkward long pauses when stock clip is longer than scene speech duration!
+      if (isPlaying && sceneElapsed >= targetDuration) {
+        handleVideoEnded();
+      }
     }
   };
 
@@ -411,6 +434,18 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
     updateScenesWithHistory(updated);
   };
 
+  const handleSceneColorGradeChange = (index: number, grade: Scene['colorGrade']) => {
+    const updated = [...scenes];
+    updated[index] = { ...updated[index], colorGrade: grade };
+    updateScenesWithHistory(updated);
+  };
+
+  const handleSceneKenBurnsChange = (index: number, motion: Scene['kenBurnsEffect']) => {
+    const updated = [...scenes];
+    updated[index] = { ...updated[index], kenBurnsEffect: motion };
+    updateScenesWithHistory(updated);
+  };
+
   const handleSceneNarrationChange = (index: number, text: string) => {
     const updated = [...scenes];
     updated[index] = { ...updated[index], urduNarration: text };
@@ -430,6 +465,20 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
     if (videoPlayerRef.current) {
       videoPlayerRef.current.playbackRate = speed;
     }
+  };
+
+  // 1-Click Auto-Sync All Scenes to Speech
+  const handleAutoSyncAllGaps = () => {
+    const synced = autoSyncAllScenesToSpeech(scenes, 'urdu', 1.0, 0.45);
+    const oldDur = totalDuration;
+    const newDur = synced.reduce((sum, s) => sum + (s.durationSeconds || 5), 0);
+    const trimmedDiff = Math.max(0, Math.round((oldDur - newDur) * 10) / 10);
+
+    updateScenesWithHistory(synced);
+    setAutoSyncFeedback(
+      `⚡ Auto-Synced ${synced.length} scenes! Trimmed ${trimmedDiff}s of silent dead gaps while maintaining natural speaking cadence.`
+    );
+    setTimeout(() => setAutoSyncFeedback(null), 5000);
   };
 
   const handleSplitScene = (index: number) => {

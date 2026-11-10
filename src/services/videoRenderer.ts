@@ -2,8 +2,8 @@ import { AspectRatio, Resolution, Scene } from '../types';
 import {
   generateSoundtrackBuffer,
   generateTransitionSfxBuffer,
-  getOrSynthesizeVoiceBuffer,
   loadAudioBufferFromUrl,
+  synthesizeAndMeasureVoiceBuffer,
   verifyExportedAudio,
 } from './audioEngine';
 
@@ -17,6 +17,7 @@ export interface RenderOptions {
   voiceoverUrl?: string;
   voiceoverVolume?: number;
   sfxVolume?: number;
+  autoSyncSpeechGaps?: boolean;
   onProgress?: (progress: number, statusText: string) => void;
 }
 
@@ -59,6 +60,7 @@ export class VideoRenderer {
       voiceoverUrl,
       voiceoverVolume = 0.95,
       sfxVolume = 0.5,
+      autoSyncSpeechGaps = true,
       onProgress,
     } = options;
 
@@ -120,16 +122,65 @@ export class VideoRenderer {
     sfxGain.gain.setValueAtTime(Math.max(0.01, sfxVolume), audioCtx.currentTime);
     sfxGain.connect(masterCompressor);
 
-    // Total duration calculation
-    const totalDurationSeconds = scenes.reduce(
-      (sum, s) => sum + (s.durationSeconds || 5),
-      0
-    );
+    // 3. Pre-load / Pre-synthesize all Audio Tracks with Silence Trimming & Exact Durations
+    onProgress?.(12, 'Synthesizing Urdu voice narration and trimming dead audio silence...');
+    const sceneVoiceBuffers: (AudioBuffer | null)[] = [];
+    const sceneSfxBuffers: (AudioBuffer | null)[] = [];
+    const sceneEffectiveDurations: number[] = [];
 
-    // 3. Pre-load / Pre-synthesize all Audio Tracks in Memory (No CORS errors, No Buffering gaps)
-    onProgress?.(10, 'Compiling multi-track soundtrack and voiceover audio...');
+    // Global voiceover if uploaded for whole video
+    const globalVoiceBuffer = voiceoverUrl
+      ? await loadAudioBufferFromUrl(audioCtx, voiceoverUrl)
+      : null;
+
+    for (let i = 0; i < scenes.length; i++) {
+      const scene = scenes[i];
+      const configuredDur = scene.durationSeconds || 5;
+
+      // Voiceover
+      if (globalVoiceBuffer) {
+        sceneVoiceBuffers.push(null);
+        sceneEffectiveDurations.push(configuredDur);
+      } else {
+        const textToSpeak = scene.urduNarration || scene.title || '';
+        try {
+          const res = await synthesizeAndMeasureVoiceBuffer(audioCtx, textToSpeak, configuredDur, 'urdu');
+          sceneVoiceBuffers.push(res.buffer);
+
+          // If auto-sync is active and speech exists, snap scene duration to spoken audio + 450ms natural transition cadence
+          if (autoSyncSpeechGaps && res.durationSeconds > 0) {
+            const syncedDur = Math.max(2.5, Math.round((res.durationSeconds + 0.45) * 10) / 10);
+            sceneEffectiveDurations.push(syncedDur);
+          } else {
+            sceneEffectiveDurations.push(configuredDur);
+          }
+        } catch (e) {
+          console.warn(`Voice buffer for scene ${i} error:`, e);
+          sceneVoiceBuffers.push(null);
+          sceneEffectiveDurations.push(configuredDur);
+        }
+      }
+
+      // Transition SFX
+      try {
+        const sfxType =
+          scene.transition === 'zoom'
+            ? 'boom'
+            : scene.transition === 'slide'
+            ? 'whoosh'
+            : 'whoosh';
+        const sfxBuf = await generateTransitionSfxBuffer(audioCtx.sampleRate, sfxType);
+        sceneSfxBuffers.push(sfxBuf);
+      } catch {
+        sceneSfxBuffers.push(null);
+      }
+    }
+
+    // Dynamic total duration calculation based on synchronized scene timings
+    const totalDurationSeconds = sceneEffectiveDurations.reduce((sum, d) => sum + d, 0);
 
     // Background Music Buffer
+    onProgress?.(22, 'Synthesizing multi-genre soundtrack...');
     let bgBuffer: AudioBuffer | null = null;
     try {
       if (bgMusicUrl) {
@@ -151,51 +202,8 @@ export class VideoRenderer {
       );
     }
 
-    // Voiceover Buffers per Scene
-    onProgress?.(18, 'Synthesizing Urdu voice narration tracks...');
-    const sceneVoiceBuffers: (AudioBuffer | null)[] = [];
-    const sceneSfxBuffers: (AudioBuffer | null)[] = [];
-
-    // Global voiceover if uploaded for whole video
-    const globalVoiceBuffer = voiceoverUrl
-      ? await loadAudioBufferFromUrl(audioCtx, voiceoverUrl)
-      : null;
-
-    for (let i = 0; i < scenes.length; i++) {
-      const scene = scenes[i];
-      const dur = scene.durationSeconds || 5;
-
-      // Voiceover
-      if (globalVoiceBuffer) {
-        sceneVoiceBuffers.push(null);
-      } else {
-        const textToSpeak = scene.urduNarration || scene.title || '';
-        try {
-          const vBuffer = await getOrSynthesizeVoiceBuffer(audioCtx, textToSpeak, dur);
-          sceneVoiceBuffers.push(vBuffer);
-        } catch (e) {
-          console.warn(`Voice buffer for scene ${i} error:`, e);
-          sceneVoiceBuffers.push(null);
-        }
-      }
-
-      // Transition SFX
-      try {
-        const sfxType =
-          scene.transition === 'zoom'
-            ? 'boom'
-            : scene.transition === 'slide'
-            ? 'whoosh'
-            : 'whoosh';
-        const sfxBuf = await generateTransitionSfxBuffer(audioCtx.sampleRate, sfxType);
-        sceneSfxBuffers.push(sfxBuf);
-      } catch {
-        sceneSfxBuffers.push(null);
-      }
-    }
-
     // Preload Scene Visual Media
-    onProgress?.(25, 'Loading visual video clips and assets...');
+    onProgress?.(30, 'Loading HD visual video clips and assets...');
     const mediaElements: (HTMLVideoElement | HTMLImageElement)[] = [];
     for (let i = 0; i < scenes.length; i++) {
       const scene = scenes[i];
@@ -280,11 +288,10 @@ export class VideoRenderer {
       duckingGain.gain.linearRampToValueAtTime(1.0, startTime + globalVoiceBuffer.duration);
     }
 
-    // Schedule Scene Voiceovers & SFX at exact timestamps
+    // Schedule Scene Voiceovers & SFX at exact synchronized timestamps
     let accumulatedTimeSeconds = 0;
     for (let sIdx = 0; sIdx < scenes.length; sIdx++) {
-      const scene = scenes[sIdx];
-      const sceneDur = scene.durationSeconds || 5;
+      const sceneDur = sceneEffectiveDurations[sIdx];
       const sceneStartAudioTime = startTime + accumulatedTimeSeconds;
 
       // SFX at scene transition
@@ -302,15 +309,15 @@ export class VideoRenderer {
         const voiceSource = audioCtx.createBufferSource();
         voiceSource.buffer = vBuf;
         voiceSource.connect(voiceGain);
-        const voiceStartTime = sceneStartAudioTime + 0.35; // 350ms delay for visual transition
+        const voiceStartTime = sceneStartAudioTime + 0.25; // 250ms lead-in
         voiceSource.start(voiceStartTime);
 
-        // Auto-duck background music during voiceover
-        const voiceDuration = Math.min(sceneDur - 0.5, vBuf.duration);
-        duckingGain.gain.setValueAtTime(1.0, voiceStartTime - 0.1);
-        duckingGain.gain.linearRampToValueAtTime(0.45, voiceStartTime);
-        duckingGain.gain.setValueAtTime(0.45, voiceStartTime + voiceDuration);
-        duckingGain.gain.linearRampToValueAtTime(1.0, voiceStartTime + voiceDuration + 0.3);
+        // Smooth Auto-ducking: ramp down before speech, hold, ramp up smoothly
+        const voiceDuration = Math.min(sceneDur - 0.2, vBuf.duration);
+        duckingGain.gain.setValueAtTime(1.0, Math.max(0, voiceStartTime - 0.15));
+        duckingGain.gain.linearRampToValueAtTime(0.22, voiceStartTime + 0.05);
+        duckingGain.gain.setValueAtTime(0.22, voiceStartTime + voiceDuration);
+        duckingGain.gain.linearRampToValueAtTime(1.0, voiceStartTime + voiceDuration + 0.35);
       }
 
       accumulatedTimeSeconds += sceneDur;
@@ -332,7 +339,7 @@ export class VideoRenderer {
 
       const scene = scenes[sceneIdx];
       const media = mediaElements[sceneIdx];
-      const sceneDuration = scene.durationSeconds || 5;
+      const sceneDuration = sceneEffectiveDurations[sceneIdx];
       const totalFrames = Math.max(1, Math.round(sceneDuration * fps));
 
       if (media instanceof HTMLVideoElement) {
@@ -346,8 +353,8 @@ export class VideoRenderer {
         if (this.isCancelled) break;
 
         const progressPercent =
-          30 +
-          Math.floor(((accumulatedRenderTime + frame / fps) / totalDurationSeconds) * 62);
+          35 +
+          Math.floor(((accumulatedRenderTime + frame / fps) / totalDurationSeconds) * 58);
         onProgress?.(
           progressPercent,
           `Encoding Scene ${sceneIdx + 1}/${scenes.length} • Mixed Audio Active (${Math.round(
@@ -355,7 +362,7 @@ export class VideoRenderer {
           )}%)`
         );
 
-        // Draw frame with transition effects
+        // Draw frame with transition effects, Ken Burns, color grade, and captions
         this.drawSceneFrame(
           media,
           scene,
@@ -442,18 +449,39 @@ export class VideoRenderer {
     // Save for transforms
     ctx.save();
 
-    // Motion effects
-    if (scene.transition === 'zoom') {
+    // Ken Burns camera motion & transitions
+    const motion =
+      scene.kenBurnsEffect ||
+      (scene.transition === 'zoom'
+        ? 'zoom_in'
+        : scene.sceneNumber % 2 === 0
+        ? 'zoom_in'
+        : 'pan_right');
+
+    if (motion === 'zoom_in') {
       const scale = 1.0 + progress * 0.08;
       ctx.translate(width / 2, height / 2);
       ctx.scale(scale, scale);
       ctx.translate(-width / 2, -height / 2);
-    } else if (scene.transition === 'slide') {
+    } else if (motion === 'zoom_out') {
+      const scale = 1.08 - progress * 0.08;
+      ctx.translate(width / 2, height / 2);
+      ctx.scale(scale, scale);
+      ctx.translate(-width / 2, -height / 2);
+    } else if (motion === 'pan_right') {
+      const offsetX = (progress - 0.5) * (width * 0.04);
+      ctx.translate(offsetX, 0);
+    } else if (motion === 'pan_left') {
+      const offsetX = (0.5 - progress) * (width * 0.04);
+      ctx.translate(offsetX, 0);
+    }
+
+    if (scene.transition === 'slide') {
       const offsetX = (1 - Math.min(1, frame / 15)) * -60;
       ctx.translate(offsetX, 0);
     }
 
-    // Fade in effect for first 12 frames
+    // Fade in / out effect
     if (frame < 12) {
       ctx.globalAlpha = frame / 12;
     } else if (frame > totalFrames - 12) {
@@ -467,6 +495,9 @@ export class VideoRenderer {
 
     ctx.restore();
 
+    // Cinematic Color Grading Layer
+    this.applyColorGrade(ctx, width, height, scene.colorGrade || 'documentary_cold');
+
     // Cinematic Dark Vignette & Gradient Overlay
     this.drawCinematicOverlay(ctx, width, height, aspectRatio);
 
@@ -475,6 +506,58 @@ export class VideoRenderer {
 
     // Watermark / Brand Badge
     this.drawBrandBadge(ctx, width, height);
+  }
+
+  private applyColorGrade(
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+    colorGrade: Scene['colorGrade']
+  ) {
+    if (!colorGrade || colorGrade === 'natural_crisp') {
+      ctx.save();
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.04)';
+      ctx.fillRect(0, 0, width, height);
+      ctx.restore();
+      return;
+    }
+
+    ctx.save();
+    if (colorGrade === 'documentary_cold') {
+      ctx.fillStyle = 'rgba(8, 51, 68, 0.10)';
+      ctx.fillRect(0, 0, width, height);
+      const coolGrad = ctx.createLinearGradient(0, 0, width, height);
+      coolGrad.addColorStop(0, 'rgba(6, 182, 212, 0.04)');
+      coolGrad.addColorStop(1, 'rgba(15, 23, 42, 0.10)');
+      ctx.fillStyle = coolGrad;
+      ctx.fillRect(0, 0, width, height);
+    } else if (colorGrade === 'warm_cinematic') {
+      const warmGrad = ctx.createLinearGradient(0, 0, width, height);
+      warmGrad.addColorStop(0, 'rgba(245, 158, 11, 0.09)');
+      warmGrad.addColorStop(1, 'rgba(180, 83, 9, 0.07)');
+      ctx.fillStyle = warmGrad;
+      ctx.fillRect(0, 0, width, height);
+    } else if (colorGrade === 'cyberpunk_glow') {
+      const cyberGrad = ctx.createLinearGradient(0, 0, width, height);
+      cyberGrad.addColorStop(0, 'rgba(168, 85, 247, 0.10)');
+      cyberGrad.addColorStop(1, 'rgba(6, 182, 212, 0.08)');
+      ctx.fillStyle = cyberGrad;
+      ctx.fillRect(0, 0, width, height);
+    } else if (colorGrade === 'spiritual_soft') {
+      const softGrad = ctx.createRadialGradient(
+        width / 2,
+        height / 2,
+        width * 0.1,
+        width / 2,
+        height / 2,
+        width * 0.7
+      );
+      softGrad.addColorStop(0, 'rgba(251, 191, 36, 0.08)');
+      softGrad.addColorStop(1, 'rgba(30, 27, 75, 0.10)');
+      ctx.fillStyle = softGrad;
+      ctx.fillRect(0, 0, width, height);
+    }
+    ctx.restore();
   }
 
   private drawCover(

@@ -41,10 +41,11 @@ app.get('/api/status', (req, res) => {
 
 // Curated high-quality video library for instant, reliable fallback & out-of-the-box experience
 const CURATED_VIDEOS = [
+  // Business & Finance
   {
     id: 'stock-biz-1',
     category: 'business',
-    tags: ['stock market', 'finance', 'charts', 'trading', 'money'],
+    tags: ['stock market', 'finance', 'charts', 'trading', 'money', 'investment', 'wall street'],
     title: 'Financial Stock Market Analysis',
     duration: 15,
     preview: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=800&auto=format&fit=crop&q=80',
@@ -54,7 +55,7 @@ const CURATED_VIDEOS = [
   {
     id: 'stock-biz-2',
     category: 'business',
-    tags: ['corporate', 'meeting', 'office', 'strategy', 'team'],
+    tags: ['corporate', 'meeting', 'office', 'strategy', 'team', 'executive', 'boardroom'],
     title: 'Modern Corporate Boardroom Strategy',
     duration: 12,
     preview: 'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=800&auto=format&fit=crop&q=80',
@@ -64,7 +65,7 @@ const CURATED_VIDEOS = [
   {
     id: 'stock-biz-3',
     category: 'business',
-    tags: ['technology', 'server', 'datacenter', 'cyber', 'ai'],
+    tags: ['technology', 'server', 'datacenter', 'cyber', 'ai', 'cloud', 'data'],
     title: 'Futuristic AI Datacenter Infrastructure',
     duration: 14,
     preview: 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=800&auto=format&fit=crop&q=80',
@@ -74,7 +75,7 @@ const CURATED_VIDEOS = [
   {
     id: 'stock-biz-4',
     category: 'business',
-    tags: ['factory', 'automation', 'robotics', 'industry', 'shipping'],
+    tags: ['factory', 'automation', 'robotics', 'industry', 'shipping', 'manufacturing', 'assembly'],
     title: 'Automated Industrial Production & Logistics',
     duration: 10,
     preview: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=800&auto=format&fit=crop&q=80',
@@ -84,7 +85,7 @@ const CURATED_VIDEOS = [
   {
     id: 'stock-biz-5',
     category: 'business',
-    tags: ['skyline', 'city', 'night', 'skyscrapers', 'global'],
+    tags: ['skyline', 'city', 'night', 'skyscrapers', 'global', 'dubai', 'new york', 'metropolis'],
     title: 'Metropolitan Night Skyline & Traffic Lights',
     duration: 18,
     preview: 'https://images.unsplash.com/photo-1477959858617-67f30bc75b82?w=800&auto=format&fit=crop&q=80',
@@ -92,9 +93,41 @@ const CURATED_VIDEOS = [
     photographer: 'Urban Cinematic',
   },
   {
+    id: 'stock-biz-6',
+    category: 'business',
+    tags: ['cryptocurrency', 'bitcoin', 'blockchain', 'digital gold', 'charts', 'crypto'],
+    title: 'Digital Cryptocurrency & Blockchain Flow',
+    duration: 14,
+    preview: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&auto=format&fit=crop&q=80',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+    photographer: 'Alpha Crypto Motion',
+  },
+  {
+    id: 'stock-biz-7',
+    category: 'business',
+    tags: ['startup', 'laptop', 'developer', 'coding', 'software', 'programming'],
+    title: 'Software Engineering & Tech Startup Growth',
+    duration: 12,
+    preview: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800&auto=format&fit=crop&q=80',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+    photographer: 'DevStudio Global',
+  },
+  {
+    id: 'stock-biz-8',
+    category: 'business',
+    tags: ['shipping', 'cargo', 'port', 'logistics', 'global trade', 'containers'],
+    title: 'Global Maritime Trade & Container Shipping',
+    duration: 16,
+    preview: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=800&auto=format&fit=crop&q=80',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
+    photographer: 'Global Commerce Lens',
+  },
+
+  // Islamic Heritage & Spiritual
+  {
     id: 'stock-islamic-1',
     category: 'islamic',
-    tags: ['mosque', 'masjid', 'architecture', 'dome', 'minaret'],
+    tags: ['mosque', 'masjid', 'architecture', 'dome', 'minaret', 'prayer'],
     title: 'Grand Mosque Majestic Arches & Minarets',
     duration: 15,
     preview: 'https://images.unsplash.com/photo-1564769625905-50e93615e769?w=800&auto=format&fit=crop&q=80',
@@ -104,7 +137,7 @@ const CURATED_VIDEOS = [
   {
     id: 'stock-islamic-2',
     category: 'islamic',
-    tags: ['quran', 'calligraphy', 'arabic', 'book', 'holy'],
+    tags: ['quran', 'calligraphy', 'arabic', 'book', 'holy', 'reflection', 'tilawat'],
     title: 'Illuminated Holy Quran Open Manuscript',
     duration: 12,
     preview: 'https://images.unsplash.com/photo-1609599006353-e629aaabfeae?w=800&auto=format&fit=crop&q=80',
@@ -114,7 +147,7 @@ const CURATED_VIDEOS = [
   {
     id: 'stock-islamic-3',
     category: 'islamic',
-    tags: ['desert', 'dunes', 'sunset', 'sand', 'sky'],
+    tags: ['desert', 'dunes', 'sunset', 'sand', 'sky', 'caravan', 'arabian'],
     title: 'Golden Sunset over Arabian Sand Dunes',
     duration: 14,
     preview: 'https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?w=800&auto=format&fit=crop&q=80',
@@ -124,7 +157,7 @@ const CURATED_VIDEOS = [
   {
     id: 'stock-islamic-4',
     category: 'islamic',
-    tags: ['lantern', 'fanous', 'ramadan', 'light', 'night'],
+    tags: ['lantern', 'fanous', 'ramadan', 'light', 'night', 'candle', 'peace'],
     title: 'Glowing Traditional Brass Lantern at Twilight',
     duration: 10,
     preview: 'https://images.unsplash.com/photo-1558223630-f8f8b88d2f1f?w=800&auto=format&fit=crop&q=80',
@@ -134,16 +167,100 @@ const CURATED_VIDEOS = [
   {
     id: 'stock-islamic-5',
     category: 'islamic',
-    tags: ['clouds', 'nature', 'peaceful', 'rain', 'mountains'],
+    tags: ['clouds', 'nature', 'peaceful', 'rain', 'mountains', 'contemplation', 'patience'],
     title: 'Peaceful Mountain Mist & Contemplation',
     duration: 16,
     preview: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&auto=format&fit=crop&q=80',
     videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WhatCarCanYouGetForAGrand.mp4',
     photographer: 'Serenity Nature Works',
   },
+  {
+    id: 'stock-islamic-6',
+    category: 'islamic',
+    tags: ['kaaba', 'makkah', 'medina', 'pilgrimage', 'hajj', 'umrah', 'sacred'],
+    title: 'Holy Makkah Spiritual Horizon',
+    duration: 15,
+    preview: 'https://images.unsplash.com/photo-1591604129939-f1efa4d9f7fa?w=800&auto=format&fit=crop&q=80',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackSeeTheWorld.mp4',
+    photographer: 'Makkah Heritage Archive',
+  },
+  {
+    id: 'stock-islamic-7',
+    category: 'islamic',
+    tags: ['stars', 'galaxy', 'universe', 'night sky', 'creation', 'wonder'],
+    title: 'Cosmic Night Sky & Divine Creation',
+    duration: 15,
+    preview: 'https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?w=800&auto=format&fit=crop&q=80',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+    photographer: 'Celestial Horizons',
+  },
+
+  // Tech, AI & Futuristic
+  {
+    id: 'stock-tech-1',
+    category: 'technology',
+    tags: ['artificial intelligence', 'neural network', 'deep learning', 'chips', 'gpu', 'semiconductor'],
+    title: 'Next-Gen Neural Processor & AI Architecture',
+    duration: 12,
+    preview: 'https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=800&auto=format&fit=crop&q=80',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4',
+    photographer: 'Silicon Pulse',
+  },
+  {
+    id: 'stock-tech-2',
+    category: 'technology',
+    tags: ['robot', 'humanoid', 'cybernetics', 'future', 'automation', 'lab'],
+    title: 'Humanoid Robotics Laboratory Testing',
+    duration: 14,
+    preview: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=800&auto=format&fit=crop&q=80',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
+    photographer: 'RoboVision Lab',
+  },
+  {
+    id: 'stock-tech-3',
+    category: 'technology',
+    tags: ['cybersecurity', 'hacker', 'code', 'security', 'firewall', 'matrix'],
+    title: 'Cybersecurity Threat Defense & Real-Time Monitoring',
+    duration: 11,
+    preview: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800&auto=format&fit=crop&q=80',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
+    photographer: 'Matrix Security Works',
+  },
+
+  // Nature, Cinematic & Atmosphere
+  {
+    id: 'stock-nature-1',
+    category: 'nature',
+    tags: ['ocean', 'waves', 'drone', 'water', 'deep sea', 'aerial'],
+    title: 'Dramatic Ocean Waves Aerial Drone View',
+    duration: 15,
+    preview: 'https://images.unsplash.com/photo-1505118380757-91f5f5632de0?w=800&auto=format&fit=crop&q=80',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
+    photographer: 'Pacific Aerial Lens',
+  },
+  {
+    id: 'stock-nature-2',
+    category: 'nature',
+    tags: ['forest', 'sunlight', 'trees', 'green', 'environment', 'ecology'],
+    title: 'Sunlight Beams Filtering Through Ancient Forest',
+    duration: 14,
+    preview: 'https://images.unsplash.com/photo-1448375240586-882707db888b?w=800&auto=format&fit=crop&q=80',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WeAreGoingOnBullrun.mp4',
+    photographer: 'Evergreen Nature Cinema',
+  },
+  {
+    id: 'stock-nature-3',
+    category: 'nature',
+    tags: ['snow', 'blizzard', 'winter', 'ice', 'arctic', 'cold'],
+    title: 'Arctic Mountain Ice & Winter Solitude',
+    duration: 16,
+    preview: 'https://images.unsplash.com/photo-1491555103944-7c647fd857e6?w=800&auto=format&fit=crop&q=80',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+    photographer: 'Nordic Visuals',
+  },
 ];
 
-// Pexels Video Search Proxy
+// Pexels Video Search Proxy with anti-duplication rotation
 app.get('/api/pexels/videos', async (req, res) => {
   const query = (req.query.query as string) || 'business technology';
   const orientation = (req.query.orientation as string) || 'landscape'; // 'landscape' | 'portrait'
@@ -192,17 +309,27 @@ app.get('/api/pexels/videos', async (req, res) => {
     }
   }
 
-  // Fallback to curated library matched against query words
-  const terms = query.toLowerCase().split(/\s+/);
-  const matched = CURATED_VIDEOS.filter((v) =>
+  // Fallback to curated library matched against query words with anti-repetition rotation
+  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+  let matched = CURATED_VIDEOS.filter((v) =>
     terms.some((t) => v.tags.some((tag) => tag.includes(t)) || v.title.toLowerCase().includes(t))
   );
 
-  const results = matched.length > 0 ? matched : CURATED_VIDEOS;
+  if (matched.length === 0) {
+    matched = CURATED_VIDEOS;
+  }
+
+  // Rotate list using hash of query so successive scenes receive distinct footage
+  const hash = query.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const rotateOffset = Math.abs(hash) % matched.length;
+  const rotated = [...matched.slice(rotateOffset), ...matched.slice(0, rotateOffset)];
+
   res.json({
-    videos: results.map((v) => ({ ...v, source: 'curated' })),
+    videos: rotated.map((v) => ({ ...v, source: 'curated' })),
     source: 'curated',
-    note: pexelsKey ? 'Used curated stock clips' : 'Enter your free Pexels API key in Settings for millions of real-time videos.',
+    note: pexelsKey
+      ? 'Used curated stock clips'
+      : 'Enter your free Pexels API key in Settings for millions of real-time videos.',
   });
 });
 
@@ -234,18 +361,19 @@ app.post('/api/gemini/documentary', async (req, res) => {
   }
 
   try {
-    const prompt = `You are the lead showrunner and director of NEXORA AI, specializing in high-impact Urdu business documentaries inspired by Dhruv Rathee, Magnates Media, and Bloomberg Originals.
+    const prompt = `You are the lead showrunner and director of NEXORA AI, specializing in high-impact Urdu business documentaries inspired by Bloomberg Originals, Magnates Media, and Vox.
 
 Topic: "${topic}"
 Target Duration: ~${durationMinutes} minutes (${durationMinutes * 60} seconds).
 Tone: ${tone}
 
-Produce a complete, gripping, research-backed Urdu documentary production package formatted strictly as a single JSON object.
-Ensure:
-1. Authentic, natural, literary Urdu script (Nastaliq style) that sounds professional, engaging, and authoritative.
-2. Provide scene-by-scene visual instructions, stock search keywords in English for Pexels stock video search, Urdu narration voiceover, English subtitles, duration (in seconds, total sum approx ${durationMinutes * 60}s), transition style ("fade", "zoom", "slide", or "cut"), and sound effects.
-3. Include background music recommendations, sound design cues, and high-CTR YouTube metadata (Title variations in Urdu/English, detailed description with chapter timestamps, tags, and hashtags).
+CRITICAL PRODUCTION RULES:
+1. COLD OPEN MANDATE: Absolutely NO greetings or pleasantries ("ناظرین کرام", "السلام علیکم", "آج ہم بات کریں گے"). Start immediately with an arresting fact, shocking revelation, or high-stakes crisis in the first 3 seconds.
+2. TIMING & AUDIO SYNCHRONIZATION: Eliminate dead silence! Average Urdu speech is 2.2 words per second. For every scene, calculate: durationSeconds = Math.max(4, Math.ceil(urduNarrationWordCount / 2.2) + 1). Never create 15-second scenes for 10 words of text!
+3. DIVERSE CINEMATIC VISUALS: Provide specific, concrete English search queries for Pexels footage for each scene (e.g. "wall street trader panic monitors", "aerial dubai night skyline drone", "automated robotic automotive factory", "boardroom executive contract signing"). Never reuse the same query across scenes.
+4. AUTHENTIC LITERARY URDU: Write elegant, natural Nastaliq Urdu script that sounds authoritative and gripping.
 
+Produce a complete production package formatted strictly as a single JSON object.
 Return ONLY valid JSON matching this schema:
 {
   "topic": string,
@@ -959,14 +1087,13 @@ Aspect Ratio: ${aspectRatio}
 Duration: ~${durationMinutes} minutes (${durationMinutes * 60} seconds)
 Tone: ${tone}
 
-Execute a complete end-to-end Topic-to-Video production package:
-1. Conduct fact-based research summary.
-2. Select the ultimate high-retention hook.
-3. Write a scene-by-scene production script strictly in ${language}.
-4. Provide precise English stock video search keywords for Pexels footage matching each scene.
-5. Provide matching background music recommendation from: 'Cinematic Documentary', 'Emotional', 'Suspense', 'Motivational', 'Islamic Ambient', 'Corporate', 'Technology', 'News'.
-6. Generate 4K thumbnail design prompt and title/description/tags for YouTube.
+CRITICAL PRODUCTION RULES:
+1. COLD OPEN MANDATE: Absolutely NO greetings or pleasantries ("ناظرین کرام", "السلام علیکم", "آج ہم بات کریں گے"). Start immediately with an arresting fact, shocking revelation, or high-stakes crisis in the first 3 seconds.
+2. TIMING & AUDIO SYNCHRONIZATION: Eliminate dead silence! Average speech is 2.2 words per second. For each scene, calculate: durationSeconds = Math.max(4, Math.ceil(urduNarrationWordCount / 2.2) + 1). Never create 15-second scenes for 10 words of text!
+3. DIVERSE CINEMATIC VISUALS: Provide specific, concrete English search queries for Pexels footage for each scene (e.g. "wall street trader panic monitors", "aerial dubai night skyline drone", "automated robotic automotive factory", "boardroom executive contract signing"). Never reuse the same query across scenes.
+4. AUTHENTIC LITERARY STYLE: Write elegant, natural script in ${language} that sounds authoritative and gripping.
 
+Execute a complete end-to-end Topic-to-Video production package.
 Return strictly JSON:
 {
   "topic": string,
@@ -980,7 +1107,7 @@ Return strictly JSON:
       "title": string,
       "visualDescription": string,
       "stockSearchQuery": string,
-      "urduNarration": string (written in ${language}),
+      "urduNarration": string,
       "englishSubtitle": string,
       "durationSeconds": number,
       "transition": "fade" | "zoom" | "slide" | "cut",
@@ -1041,7 +1168,7 @@ function generateFallbackDocumentary(topic: string, durationMinutes: number) {
         stockSearchQuery: 'stock market financial charts trading dark office',
         urduNarration: `21ویں صدی میں کامیابی صرف محنت سے نہیں ملتی، بلکہ یہ سمجھنے سے ملتی ہے کہ کھیل کے اصول کب بدل گئے۔ اور ${topic} نے یہی کیا۔`,
         englishSubtitle: `In the 21st century, success belongs to those who understand when the rules changed. That is what happened with ${topic}.`,
-        durationSeconds: 15,
+        durationSeconds: 9,
         transition: 'zoom' as const,
         soundEffect: 'Dramatic cinematic boom & whoosh',
       },
@@ -1052,7 +1179,7 @@ function generateFallbackDocumentary(topic: string, durationMinutes: number) {
         stockSearchQuery: 'datacenter server technology ai modern corporate',
         urduNarration: `چند سال قبل یہ محض ایک چھوٹا سا آئیڈیا تھا۔ لیکن جب بڑے سرمایہ کاروں نے اس میں اربوں ڈالر ڈالے، تو یہ صنعت ایک طوفان بن گئی۔`,
         englishSubtitle: `A few years ago, it was merely an idea. But once venture capital poured in, it turned into an unstoppable juggernaut.`,
-        durationSeconds: 20,
+        durationSeconds: 9,
         transition: 'fade' as const,
         soundEffect: 'Subtle digital clicks and rising synthesizer',
       },
@@ -1063,7 +1190,7 @@ function generateFallbackDocumentary(topic: string, durationMinutes: number) {
         stockSearchQuery: 'automated factory robotics logistics shipping',
         urduNarration: `لیکن ہر بڑی کامیابی کے پیچھے کچھ چھپے ہوئے راز اور سخت چیلنجز ہوتے ہیں۔ منافع کی اس جنگ میں کئی نامور حریف راستے سے ہٹ گئے۔`,
         englishSubtitle: `Behind every massive success lie fierce rivalries and concealed challenges. Many competitors were wiped out along the way.`,
-        durationSeconds: 25,
+        durationSeconds: 10,
         transition: 'slide' as const,
         soundEffect: 'Tense ticking clock and low frequency bass pulse',
       },
@@ -1074,7 +1201,7 @@ function generateFallbackDocumentary(topic: string, durationMinutes: number) {
         stockSearchQuery: 'metropolitan night skyline business vision technology',
         urduNarration: `اب سوال یہ ہے کہ کیا آپ اس نئی لہر کے لیے تیار ہیں؟ کیونکہ جو لوگ بدلتے وقت کو نہیں پہچانتے، وہ تاریخ کے پنوں میں گم ہو جاتے ہیں۔`,
         englishSubtitle: `The final question remains: Are you prepared for this wave? Because those who ignore the future are quickly forgotten.`,
-        durationSeconds: 20,
+        durationSeconds: 9,
         transition: 'fade' as const,
         soundEffect: 'Epic orchestral climax and lingering echo',
       },

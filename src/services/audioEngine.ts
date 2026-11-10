@@ -1,5 +1,5 @@
 import { generateSpeechAudio } from './api';
-import { BgmCategory, SoundEffectItem, VideoLanguage } from '../types';
+import { BgmCategory, Scene, SoundEffectItem, TimelineHealthIssue, TimelineHealthReport, VideoLanguage } from '../types';
 
 export interface SoundtrackTrack {
   id: string;
@@ -970,6 +970,249 @@ export async function loadAudioBufferFromUrl(
 }
 
 /**
+ * Accurately estimates spoken voiceover duration for a sentence based on word count,
+ * syllable cadence, and punctuation pause intervals.
+ */
+export function estimateSentenceSpeechDuration(
+  text: string,
+  language: VideoLanguage = 'urdu',
+  speed: number = 1.0
+): number {
+  if (!text || !text.trim()) return 2.5;
+
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  const wordCount = words.length;
+
+  // Average syllables per word and speaking cadence
+  // Urdu: ~140 words per minute (2.33 words/sec). Punctuation adds natural breathing pauses.
+  let baseSecondsPerWord = 0.44;
+  if (language === 'english') baseSecondsPerWord = 0.40;
+  else if (language === 'arabic') baseSecondsPerWord = 0.48;
+  else if (language === 'hindi') baseSecondsPerWord = 0.43;
+
+  let speechDuration = wordCount * baseSecondsPerWord;
+
+  // Add natural pauses for punctuation
+  const commaCount = (text.match(/[،,]/g) || []).length;
+  const periodCount = (text.match(/[۔.?!\n]/g) || []).length;
+  speechDuration += commaCount * 0.25 + periodCount * 0.42;
+
+  // Factor in speech speed
+  const effectiveSpeed = Math.max(0.5, Math.min(2.0, speed || 1.0));
+  speechDuration = speechDuration / effectiveSpeed;
+
+  // Minimum scene duration for visual comprehension is 2.5 seconds
+  return Math.max(2.5, Math.round(speechDuration * 10) / 10);
+}
+
+/**
+ * Trims dead silence from leading and trailing edges of an AudioBuffer while preserving natural attack and decay.
+ * Eliminates artificial gaps between narration lines.
+ */
+export function trimAudioBufferSilence(
+  audioCtx: AudioContext | OfflineAudioContext,
+  buffer: AudioBuffer,
+  silenceThresholdDb: number = -42,
+  padMs: number = 120
+): AudioBuffer {
+  const threshold = Math.pow(10, silenceThresholdDb / 20); // ~0.0079
+  const numChannels = buffer.numberOfChannels;
+  const sampleRate = buffer.sampleRate;
+  const padSamples = Math.round((padMs / 1000) * sampleRate);
+
+  let firstSample = buffer.length;
+  let lastSample = 0;
+
+  for (let c = 0; c < numChannels; c++) {
+    const data = buffer.getChannelData(c);
+    for (let i = 0; i < data.length; i++) {
+      if (Math.abs(data[i]) > threshold) {
+        if (i < firstSample) firstSample = i;
+        break;
+      }
+    }
+    for (let i = data.length - 1; i >= 0; i--) {
+      if (Math.abs(data[i]) > threshold) {
+        if (i > lastSample) lastSample = i;
+        break;
+      }
+    }
+  }
+
+  // If entirely silent, return the original
+  if (firstSample >= lastSample) {
+    return buffer;
+  }
+
+  const startSample = Math.max(0, firstSample - padSamples);
+  const endSample = Math.min(buffer.length, lastSample + padSamples);
+  const trimmedLength = Math.max(1, endSample - startSample);
+
+  // If trimming saves less than 120ms, keep original
+  if (trimmedLength > buffer.length - Math.round(0.12 * sampleRate)) {
+    return buffer;
+  }
+
+  const trimmedBuffer = audioCtx.createBuffer(numChannels, trimmedLength, sampleRate);
+  for (let c = 0; c < numChannels; c++) {
+    const srcData = buffer.getChannelData(c);
+    const destData = trimmedBuffer.getChannelData(c);
+    destData.set(srcData.subarray(startSample, endSample));
+  }
+
+  return trimmedBuffer;
+}
+
+/**
+ * Synthesizes vocal narration, trims dead silence, and returns exact audio duration in seconds.
+ */
+export async function synthesizeAndMeasureVoiceBuffer(
+  audioCtx: AudioContext,
+  text: string,
+  targetDurationSeconds: number,
+  language: VideoLanguage = 'urdu',
+  voiceName: string = 'Kore',
+  speed: number = 1.0
+): Promise<{ buffer: AudioBuffer; exactDurationSeconds: number }> {
+  const rawBuffer = await getOrSynthesizeVoiceBuffer(audioCtx, text, targetDurationSeconds, language, voiceName);
+  const trimmedBuffer = trimAudioBufferSilence(audioCtx, rawBuffer);
+  return {
+    buffer: trimmedBuffer,
+    exactDurationSeconds: Math.round(trimmedBuffer.duration * 100) / 100,
+  };
+}
+
+/**
+ * Audits timeline scenes for audio gaps, missing speech, and video mismatches.
+ */
+export function auditTimelineHealth(
+  scenes: Scene[],
+  language: VideoLanguage = 'urdu',
+  voiceSpeed: number = 1.0
+): TimelineHealthReport {
+  const issues: TimelineHealthIssue[] = [];
+  let totalDeadSilenceSeconds = 0;
+  let totalAudioDurationSeconds = 0;
+  let totalVideoDurationSeconds = 0;
+
+  const seenVideoUrls = new Map<string, number[]>();
+
+  scenes.forEach((scene, idx) => {
+    const sceneDur = scene.durationSeconds || 5;
+    totalVideoDurationSeconds += sceneDur;
+
+    const narration = scene.urduNarration || scene.englishSubtitle || '';
+    const estimatedAudio = scene.audioDurationSeconds || estimateSentenceSpeechDuration(narration, language, voiceSpeed);
+    totalAudioDurationSeconds += estimatedAudio;
+
+    // Check for empty narration
+    if (!narration.trim()) {
+      issues.push({
+        id: `missing-narr-${idx}`,
+        sceneIndex: idx,
+        type: 'missing_narration',
+        severity: 'warning',
+        message: `Scene ${idx + 1} has no narration voiceover.`,
+        suggestedDurationSeconds: 4.0,
+      });
+    }
+
+    // Check for silent gap: scene duration much longer than audio
+    const gap = sceneDur - (estimatedAudio + 0.45);
+    if (gap > 1.2) {
+      totalDeadSilenceSeconds += gap;
+      issues.push({
+        id: `gap-${idx}`,
+        sceneIndex: idx,
+        type: 'silent_gap',
+        severity: 'warning',
+        message: `Scene ${idx + 1} has ~${gap.toFixed(1)}s of dead silence after speech ends.`,
+        suggestedDurationSeconds: Math.max(2.5, Math.round((estimatedAudio + 0.45) * 10) / 10),
+      });
+    }
+
+    // Check for audio overrun: voice longer than scene duration
+    if (estimatedAudio > sceneDur + 0.4) {
+      const overrun = (estimatedAudio - sceneDur).toFixed(1);
+      issues.push({
+        id: `overrun-${idx}`,
+        sceneIndex: idx,
+        type: 'audio_overrun',
+        severity: 'error',
+        message: `Scene ${idx + 1} narration is ${overrun}s longer than scene duration (speech will collide).`,
+        suggestedDurationSeconds: Math.round((estimatedAudio + 0.45) * 10) / 10,
+      });
+    }
+
+    // Check for duplicate clips
+    if (scene.videoUrl && !scene.videoUrl.includes('blank')) {
+      const existing = seenVideoUrls.get(scene.videoUrl) || [];
+      existing.push(idx);
+      seenVideoUrls.set(scene.videoUrl, existing);
+    }
+  });
+
+  // Track duplicate footage issues
+  let duplicateClipsCount = 0;
+  seenVideoUrls.forEach((indices) => {
+    if (indices.length > 1) {
+      duplicateClipsCount += indices.length - 1;
+      issues.push({
+        id: `dup-${indices[0]}`,
+        sceneIndex: indices[1],
+        type: 'duplicate_clip',
+        severity: 'info',
+        message: `Scenes ${indices.map((i) => i + 1).join(', ')} use identical footage.`,
+      });
+    }
+  });
+
+  // Calculate overall score
+  let score = 100;
+  issues.forEach((issue) => {
+    if (issue.severity === 'error') score -= 18;
+    else if (issue.severity === 'warning') score -= 8;
+    else if (issue.severity === 'info') score -= 3;
+  });
+  const overallScore = Math.max(10, Math.min(100, Math.round(score)));
+  const status = overallScore >= 85 ? 'optimal' : overallScore >= 60 ? 'warnings' : 'needs_fix';
+
+  return {
+    overallScore,
+    status,
+    issues,
+    totalDeadSilenceSeconds: Math.round(totalDeadSilenceSeconds * 10) / 10,
+    totalAudioDurationSeconds: Math.round(totalAudioDurationSeconds * 10) / 10,
+    totalVideoDurationSeconds: Math.round(totalVideoDurationSeconds * 10) / 10,
+    duplicateClipsCount,
+    missingMediaCount: 0,
+  };
+}
+
+/**
+ * Automatically synchronizes all scenes so each scene's duration matches exact voice duration + natural cadence.
+ * Completely eliminates dead silence gaps.
+ */
+export function autoSyncAllScenesToSpeech(
+  scenes: Scene[],
+  language: VideoLanguage = 'urdu',
+  voiceSpeed: number = 1.0,
+  cadencePaddingSeconds: number = 0.45
+): Scene[] {
+  return scenes.map((scene) => {
+    const text = scene.urduNarration || scene.englishSubtitle || '';
+    const audioDur = scene.audioDurationSeconds || estimateSentenceSpeechDuration(text, language, voiceSpeed);
+    const syncedDuration = Math.max(2.5, Math.round((audioDur + cadencePaddingSeconds) * 10) / 10);
+
+    return {
+      ...scene,
+      audioDurationSeconds: audioDur,
+      durationSeconds: syncedDuration,
+    };
+  });
+}
+
+/**
  * Synthesizes an authentic vocal narration AudioBuffer in the selected language.
  * 1. Checks Gemini TTS server API for real WAV speech audio.
  * 2. If API is offline or returns fallback, synthesizes human speech formant audio in-memory!
@@ -986,14 +1229,17 @@ export async function getOrSynthesizeVoiceBuffer(
     const ttsRes = await generateSpeechAudio(text, voiceName);
     if (ttsRes.success && ttsRes.dataUri) {
       const decoded = await loadAudioBufferFromUrl(audioCtx, ttsRes.dataUri);
-      if (decoded) return decoded;
+      if (decoded) {
+        return trimAudioBufferSilence(audioCtx, decoded);
+      }
     }
   } catch (e) {
     console.warn('Server TTS unavailable, using local speech synthesis:', e);
   }
 
   // Attempt 2: Vocal formant synthesis tuned for language rhythm
-  return await synthesizeFormantSpeechBuffer(audioCtx.sampleRate, text, targetDurationSeconds, language);
+  const rawFormant = await synthesizeFormantSpeechBuffer(audioCtx.sampleRate, text, targetDurationSeconds, language);
+  return trimAudioBufferSilence(audioCtx, rawFormant);
 }
 
 /**
