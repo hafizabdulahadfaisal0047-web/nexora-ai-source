@@ -9,6 +9,7 @@ import {
   ArrowRight,
   Sliders,
   Check,
+  AlertCircle,
 } from 'lucide-react';
 import { SoundEffectItem } from '../types';
 import {
@@ -25,6 +26,7 @@ export const SoundEffectsStudio: React.FC<SoundEffectsStudioProps> = ({ onInsert
   const [activePlayingId, setActivePlayingId] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [volume, setVolume] = useState<number>(0.85);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
@@ -108,7 +110,7 @@ export const SoundEffectsStudio: React.FC<SoundEffectsStudioProps> = ({ onInsert
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (err: any) {
-      alert(`Download note: ${err.message}`);
+      setErrorMsg(err.message || 'Unable to export WAV sound effect.');
     } finally {
       setDownloadingId(null);
     }
@@ -131,6 +133,16 @@ export const SoundEffectsStudio: React.FC<SoundEffectsStudioProps> = ({ onInsert
           </p>
         </div>
       </div>
+
+      {errorMsg && (
+        <div className="p-4 rounded-2xl bg-rose-950/30 border border-rose-500/40 text-xs text-rose-200 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+          <button onClick={() => setErrorMsg(null)} className="text-rose-300 hover:text-white font-bold">Dismiss</button>
+        </div>
+      )}
 
       {/* Volume Control */}
       <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex items-center justify-between gap-4 max-w-md">

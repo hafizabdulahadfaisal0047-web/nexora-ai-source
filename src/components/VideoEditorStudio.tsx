@@ -36,24 +36,34 @@ import {
   ShieldCheck,
   Wand2,
   Palette,
+  AlertCircle,
+  Check,
+  FileText,
+  Share2,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { AspectRatio, Project, Resolution, Scene, StockVideo, TransitionType } from '../types';
+import {
+  AspectRatio,
+  Project,
+  Resolution,
+  Scene,
+  StockVideo,
+  TransitionType,
+  VideoLanguage,
+} from '../types';
 import { VideoRenderer, RenderResult, downloadVideoFile } from '../services/videoRenderer';
-import { getCuratedVideos, searchStockVideos } from '../services/api';
+import { getCuratedVideos, searchUnifiedMedia, recordExportHistory } from '../services/api';
 import { UrduVoiceService } from '../services/audioSynthesizer';
 import {
   generateSoundtrackBuffer,
   ROYALTY_FREE_SOUNDTRACKS,
   auditTimelineHealth,
   autoSyncAllScenesToSpeech,
-  estimateSentenceSpeechDuration,
 } from '../services/audioEngine';
 
 interface VideoEditorStudioProps {
   currentProject: Project | null;
   onSaveProject: (project: Project) => void;
-  customPexelsKey?: string;
 }
 
 const DEFAULT_SCENES: Scene[] = [
@@ -101,12 +111,23 @@ const DEFAULT_SCENES: Scene[] = [
 export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
   currentProject,
   onSaveProject,
-  customPexelsKey,
 }) => {
   // Project settings
   const [projectTitle, setProjectTitle] = useState(currentProject?.title || 'Untitled Video Project');
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>(currentProject?.aspectRatio || '16:9');
   const [resolution, setResolution] = useState<Resolution>(currentProject?.resolution || '1080p');
+  const [projectLanguage, setProjectLanguage] = useState<VideoLanguage>(
+    currentProject?.primaryLanguage || 'urdu'
+  );
+  const [platformTarget, setPlatformTarget] = useState<
+    'YouTube 16:9' | 'YouTube Shorts 9:16' | 'Instagram Reels 9:16' | 'Square 1:1'
+  >(
+    currentProject?.aspectRatio === '9:16'
+      ? 'YouTube Shorts 9:16'
+      : currentProject?.aspectRatio === '1:1'
+      ? 'Square 1:1'
+      : 'YouTube 16:9'
+  );
   const [scenes, setScenes] = useState<Scene[]>(
     currentProject?.scenes && currentProject.scenes.length > 0
       ? currentProject.scenes
@@ -206,6 +227,8 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
   const [stockQuery, setStockQuery] = useState('');
   const [stockClips, setStockClips] = useState<StockVideo[]>([]);
   const [stockLoading, setStockLoading] = useState(false);
+  const [stockPage, setStockPage] = useState(1);
+  const [stockHasMore, setStockHasMore] = useState(false);
 
   // Real Rendering State
   const [isRendering, setIsRendering] = useState(false);
@@ -213,20 +236,34 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
   const [renderStatus, setRenderStatus] = useState('');
   const [renderResult, setRenderResult] = useState<RenderResult | null>(null);
   const rendererRef = useRef<VideoRenderer | null>(null);
+  const [copiedMetadata, setCopiedMetadata] = useState(false);
 
   // Timeline Health & Timing Synchronization State
   const [showHealthModal, setShowHealthModal] = useState(false);
   const [autoSyncFeedback, setAutoSyncFeedback] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const healthReport = useMemo(() => {
-    return auditTimelineHealth(scenes, 'urdu', 1.0);
-  }, [scenes]);
+    return auditTimelineHealth(scenes, projectLanguage, 1.0);
+  }, [scenes, projectLanguage]);
 
   useEffect(() => {
     if (currentProject) {
       setProjectTitle(currentProject.title);
-      setAspectRatio(currentProject.aspectRatio || '16:9');
+      const nextAspect = currentProject.aspectRatio || '16:9';
+      setAspectRatio(nextAspect);
       setResolution(currentProject.resolution || '1080p');
+      setProjectLanguage(currentProject.primaryLanguage || 'urdu');
+      setPlatformTarget(
+        nextAspect === '9:16'
+          ? 'YouTube Shorts 9:16'
+          : nextAspect === '1:1'
+          ? 'Square 1:1'
+          : 'YouTube 16:9'
+      );
+      if (currentProject.bgMusicTrack) {
+        setBgMusic(currentProject.bgMusicTrack);
+      }
       if (currentProject.scenes && currentProject.scenes.length > 0) {
         setScenes(currentProject.scenes);
         setHistory([currentProject.scenes]);
@@ -320,7 +357,7 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
     }
   };
 
-  // Play Urdu Voice narration for active scene
+  // Play Voice narration for active scene in project's primary language
   const startSceneNarration = (sceneIdx: number) => {
     if (isMuted) return;
     const scene = scenes[sceneIdx];
@@ -336,7 +373,9 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
 
     if (scene.urduNarration && scene.urduNarration.trim()) {
       voiceServiceRef.current?.stop();
+      const langVoices = voiceServiceRef.current?.getVoicesForLanguage(projectLanguage) || [];
       voiceServiceRef.current?.speak(scene.urduNarration, {
+        voice: langVoices[0]?.voice || null,
         volume: voiceoverVolume,
         rate: 0.95,
         onError: () => {},
@@ -473,14 +512,14 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
 
   // 1-Click Auto-Sync All Scenes to Speech
   const handleAutoSyncAllGaps = () => {
-    const synced = autoSyncAllScenesToSpeech(scenes, 'urdu', 1.0, 0.45);
+    const synced = autoSyncAllScenesToSpeech(scenes, projectLanguage, 1.0, 0.45);
     const oldDur = totalDuration;
     const newDur = synced.reduce((sum, s) => sum + (s.durationSeconds || 5), 0);
     const trimmedDiff = Math.max(0, Math.round((oldDur - newDur) * 10) / 10);
 
     updateScenesWithHistory(synced);
     setAutoSyncFeedback(
-      `⚡ Auto-Synced ${synced.length} scenes! Trimmed ${trimmedDiff}s of silent dead gaps while maintaining natural speaking cadence.`
+      `Auto-Synced ${synced.length} scenes (${projectLanguage.toUpperCase()})! Trimmed ${trimmedDiff}s of dead silence while keeping natural cadence.`
     );
     setTimeout(() => setAutoSyncFeedback(null), 5000);
   };
@@ -558,7 +597,7 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
 
   const handleDeleteScene = (index: number) => {
     if (scenes.length <= 1) {
-      alert('Video must contain at least 1 scene');
+      setErrorMsg('Video timeline must contain at least 1 scene.');
       return;
     }
     const updated = scenes.filter((_, i) => i !== index);
@@ -598,6 +637,9 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
         videoUrl: url,
         previewUrl: url,
         isCustomUpload: true,
+        sourceProvider: 'upload',
+        photographer: 'User Upload',
+        license: 'User Owned Media',
       };
       setScenes(updated);
     }
@@ -620,42 +662,61 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
     }
   };
 
+  const getExcludedUrlsForScene = (idx: number): string[] => {
+    return scenes
+      .filter((_, i) => i !== idx)
+      .map((s) => s.videoUrl || '')
+      .filter(Boolean);
+  };
+
   const openStockModal = async (sceneIdx: number) => {
     setStockModalSceneIdx(sceneIdx);
     const scene = scenes[sceneIdx];
-    const initial = scene.stockSearchQuery || 'business corporate';
+    const initial = scene.stockSearchQuery || scene.visualDescription || 'business corporate';
     setStockQuery(initial);
+    setStockPage(1);
     setStockLoading(true);
     try {
-      const res = await searchStockVideos(
-        initial,
-        aspectRatio === '9:16' ? 'portrait' : 'landscape',
-        9,
-        customPexelsKey
-      );
+      const res = await searchUnifiedMedia({
+        query: initial,
+        orientation: aspectRatio === '9:16' ? 'portrait' : aspectRatio === '1:1' ? 'square' : 'landscape',
+        perPage: 9,
+        page: 1,
+        excludeUrls: getExcludedUrlsForScene(sceneIdx),
+      });
       setStockClips(res.videos);
+      setStockHasMore(!!res.hasMore);
     } catch {
       const cur = await getCuratedVideos();
       setStockClips(cur.videos);
+      setStockHasMore(false);
     } finally {
       setStockLoading(false);
     }
   };
 
-  const handleSearchStock = async () => {
+  const handleSearchStock = async (pageToLoad: number = 1) => {
     if (!stockQuery.trim()) return;
     setStockLoading(true);
     try {
-      const res = await searchStockVideos(
-        stockQuery,
-        aspectRatio === '9:16' ? 'portrait' : 'landscape',
-        9,
-        customPexelsKey
-      );
-      setStockClips(res.videos);
+      const res = await searchUnifiedMedia({
+        query: stockQuery,
+        orientation: aspectRatio === '9:16' ? 'portrait' : aspectRatio === '1:1' ? 'square' : 'landscape',
+        perPage: 9,
+        page: pageToLoad,
+        excludeUrls: stockModalSceneIdx !== null ? getExcludedUrlsForScene(stockModalSceneIdx) : [],
+      });
+      if (pageToLoad === 1) {
+        setStockClips(res.videos);
+      } else {
+        setStockClips((prev) => [...prev, ...res.videos]);
+      }
+      setStockPage(pageToLoad);
+      setStockHasMore(!!res.hasMore);
     } catch {
       const cur = await getCuratedVideos();
       setStockClips(cur.videos);
+      setStockHasMore(false);
     } finally {
       setStockLoading(false);
     }
@@ -669,14 +730,81 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
       videoUrl: video.videoUrl,
       previewUrl: video.preview,
       stockSearchQuery: stockQuery,
+      sourceProvider: video.source,
+      photographer: video.photographer,
+      license: video.license,
+      attributionText: video.attributionText,
     };
-    setScenes(updated);
+    updateScenesWithHistory(updated);
     setStockModalSceneIdx(null);
+  };
+
+  const handlePlatformSelect = (
+    target: 'YouTube 16:9' | 'YouTube Shorts 9:16' | 'Instagram Reels 9:16' | 'Square 1:1'
+  ) => {
+    setPlatformTarget(target);
+    if (target === 'YouTube 16:9') setAspectRatio('16:9');
+    else if (target === 'Square 1:1') setAspectRatio('1:1');
+    else setAspectRatio('9:16');
+  };
+
+  const formatSrtTime = (seconds: number) => {
+    const pad = (n: number, z = 2) => ('00' + n).slice(-z);
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    const ms = Math.floor((seconds % 1) * 1000);
+    return `${pad(hrs)}:${pad(mins)}:${pad(secs)},${pad(ms, 3)}`;
+  };
+
+  const handleDownloadTimelineSrt = () => {
+    let cursor = 0;
+    const srt = scenes
+      .map((s, idx) => {
+        const start = cursor;
+        const dur = Math.max(1, s.durationSeconds || 5);
+        cursor += dur;
+        return `${idx + 1}\n${formatSrtTime(start)} --> ${formatSrtTime(cursor)}\n${s.urduNarration || s.englishSubtitle || s.title}\n`;
+      })
+      .join('\n');
+    const blob = new Blob([srt], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${projectTitle.replace(/\s+/g, '_')}_captions.srt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleCopyPlatformPackage = () => {
+    const seo = currentProject?.youtubeSeo;
+    const tagsStr = seo?.tags?.join(', ') || `${projectTitle}, NEXORA AI, documentary`;
+    const hashStr = seo?.hashtags?.join(' ') || '#Documentary #NEXORA';
+    const credits = scenes
+      .map((s, idx) => `Scene ${idx + 1}: ${s.photographer || 'Archive'} (${s.sourceProvider || 'curated'}) - ${s.license || 'Commercial Free'}`)
+      .join('\n');
+    const pkg = [
+      `TITLE: ${projectTitle}`,
+      `TARGET PLATFORM: ${platformTarget} (${aspectRatio} • ${resolution})`,
+      `LANGUAGE: ${projectLanguage.toUpperCase()}`,
+      `DURATION: ~${totalDuration}s`,
+      `\nDESCRIPTION:\n${seo?.description || scenes.map((s) => s.urduNarration).join(' ')}`,
+      `\nTAGS: ${tagsStr}`,
+      `HASHTAGS: ${hashStr}`,
+      `\nCTA: Subscribe & follow for more stories.`,
+      `\nMEDIA ATTRIBUTION:\n${credits}`,
+    ].join('\n');
+    navigator.clipboard.writeText(pkg);
+    setCopiedMetadata(true);
+    setTimeout(() => setCopiedMetadata(false), 2000);
   };
 
   // Real Video Export Execution
   const handleStartRender = async () => {
     setIsRendering(true);
+    setErrorMsg(null);
     setRenderProgress(0);
     setRenderStatus('Initializing video and multi-track audio engine...');
 
@@ -688,6 +816,7 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
         scenes,
         aspectRatio,
         resolution,
+        primaryLanguage: projectLanguage,
         bgMusicTrack: bgMusic,
         bgMusicUrl: customAudioUrl || undefined,
         bgMusicVolume,
@@ -699,6 +828,10 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
           setRenderStatus(s);
         },
       });
+
+      if (!result.hasVerifiedAudio) {
+        throw new Error('Export verification failed: output stream contained no active audio track.');
+      }
 
       setRenderResult(result);
 
@@ -712,11 +845,13 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
         });
       } catch (_) {}
 
-      // Save to project store
+      // Save to project store & export history
+      const projId = currentProject?.id || `proj_${Date.now()}`;
       const updatedProject: Project = {
-        id: currentProject?.id || `proj_${Date.now()}`,
+        id: projId,
         title: projectTitle,
         type: currentProject?.type || (aspectRatio === '9:16' ? 'islamic_reel' : 'business_documentary'),
+        primaryLanguage: projectLanguage,
         createdAt: currentProject?.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         aspectRatio,
@@ -725,10 +860,22 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
         bgMusicTrack: bgMusic,
         bgMusicVolume,
         exportedVideoUrl: result.url,
+        youtubeSeo: currentProject?.youtubeSeo,
       };
       onSaveProject(updatedProject);
+
+      recordExportHistory({
+        projectId: projId,
+        projectTitle,
+        platformTarget,
+        resolution,
+        mimeType: result.mimeType,
+        durationSeconds: Math.round(result.durationSeconds),
+        fileSizeBytes: result.fileSizeBytes,
+        hasVerifiedAudio: result.hasVerifiedAudio,
+      }).catch(() => {});
     } catch (e: any) {
-      alert(`Export note: ${e.message}`);
+      setErrorMsg(e.message || 'Video render failed.');
     } finally {
       setIsRendering(false);
       rendererRef.current = null;
@@ -791,6 +938,31 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
             </button>
           </div>
 
+          {/* Platform Export Preset Selector */}
+          <select
+            value={platformTarget}
+            onChange={(e) => handlePlatformSelect(e.target.value as any)}
+            className="px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-700 text-xs font-semibold text-cyan-300 outline-none"
+          >
+            <option value="YouTube 16:9">YouTube (16:9)</option>
+            <option value="YouTube Shorts 9:16">YouTube Shorts (9:16)</option>
+            <option value="Instagram Reels 9:16">Instagram Reels (9:16)</option>
+            <option value="Square 1:1">Square Social (1:1)</option>
+          </select>
+
+          {/* Primary Language Switcher */}
+          <select
+            value={projectLanguage}
+            onChange={(e) => setProjectLanguage(e.target.value as VideoLanguage)}
+            className="px-2.5 py-1.5 rounded-xl bg-slate-800 border border-slate-700 text-xs font-semibold text-purple-300 outline-none"
+          >
+            <option value="urdu">Urdu</option>
+            <option value="english">English</option>
+            <option value="roman_urdu">Roman Urdu</option>
+            <option value="arabic">Arabic</option>
+            <option value="hindi">Hindi</option>
+          </select>
+
           {/* Resolution Selector */}
           <select
             value={resolution}
@@ -821,6 +993,16 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
           </button>
         </div>
       </div>
+
+      {errorMsg && (
+        <div className="p-4 rounded-2xl bg-rose-950/30 border border-rose-500/40 text-xs text-rose-200 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+          <button onClick={() => setErrorMsg(null)} className="text-rose-300 hover:text-white font-bold">Dismiss</button>
+        </div>
+      )}
 
       {/* Main Workspace Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -1238,6 +1420,11 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
                   />
                 </label>
               </div>
+              {activeScene?.photographer && (
+                <p className="text-[10px] text-slate-400 mt-1.5 truncate">
+                  Source: <span className="text-cyan-300 uppercase font-semibold">{activeScene.sourceProvider || 'curated'}</span> • Credit: {activeScene.photographer} • {activeScene.license || 'Commercial Free'}
+                </p>
+              )}
             </div>
 
             {/* Urdu Subtitle / Voiceover text */}
@@ -1639,9 +1826,28 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
             </div>
 
             <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
+              <span>Platform: <strong className="text-cyan-300">{platformTarget}</strong></span>
               <span>File: <strong className="text-white font-mono">{renderResult.fileName}</strong></span>
               <span>Duration: <strong className="text-white font-mono">~{Math.round(renderResult.durationSeconds)}s</strong></span>
               <span>Size: <strong className="text-cyan-400 font-mono">{Math.round(renderResult.fileSizeBytes / 1024)} KB</strong></span>
+            </div>
+
+            <div className="flex flex-wrap gap-2.5">
+              <button
+                onClick={handleDownloadTimelineSrt}
+                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-purple-300 border border-slate-700 text-xs font-bold flex items-center gap-1.5"
+              >
+                <FileText className="w-4 h-4" />
+                <span>Download .SRT Captions</span>
+              </button>
+
+              <button
+                onClick={handleCopyPlatformPackage}
+                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-700 text-xs font-bold flex items-center gap-1.5"
+              >
+                {copiedMetadata ? <Check className="w-4 h-4" /> : <Share2 className="w-4 h-4" />}
+                <span>{copiedMetadata ? 'Platform Package Copied!' : 'Copy Metadata + CTA Package'}</span>
+              </button>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3">
@@ -1681,7 +1887,7 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
               <div>
                 <h3 className="text-base font-bold text-white">Select Stock Video for Scene</h3>
                 <p className="text-xs text-slate-400">
-                  Search free commercial videos from Pexels API
+                  Unified multi-provider search (Pexels, Pixabay &amp; Curated Archive) • Duplicate clips auto-filtered
                 </p>
               </div>
               <button
@@ -1697,12 +1903,12 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
                 type="text"
                 value={stockQuery}
                 onChange={(e) => setStockQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSearchStock()}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearchStock(1)}
                 placeholder="Search stock footage: corporate strategy, datacenter, city lights, finance..."
                 className="flex-1 px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white outline-none focus:border-cyan-400"
               />
               <button
-                onClick={handleSearchStock}
+                onClick={() => handleSearchStock(1)}
                 className="px-4 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center gap-1.5"
               >
                 <Search className="w-4 h-4" />
@@ -1711,32 +1917,57 @@ export const VideoEditorStudio: React.FC<VideoEditorStudioProps> = ({
             </div>
 
             <div className="flex-1 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 py-2">
-              {stockLoading ? (
+              {stockLoading && stockClips.length === 0 ? (
                 <div className="col-span-full text-center py-12 text-slate-400">
                   <RefreshCw className="w-6 h-6 animate-spin mx-auto text-cyan-400 mb-2" />
                   <span>Loading stock footage...</span>
                 </div>
+              ) : stockClips.length === 0 ? (
+                <div className="col-span-full text-center py-12 text-slate-400">
+                  No stock footage found for this query. Try simpler keywords.
+                </div>
               ) : (
-                stockClips.map((v) => (
-                  <div
-                    key={v.id}
-                    onClick={() => handleSelectStockClip(v)}
-                    className="cursor-pointer group relative rounded-xl overflow-hidden bg-slate-800 border border-slate-700 hover:border-cyan-400 transition-all"
-                  >
-                    <div className="aspect-video bg-slate-950">
-                      <img src={v.preview} alt={v.title} className="w-full h-full object-cover" />
+                <>
+                  {stockClips.map((v) => (
+                    <div
+                      key={v.id}
+                      onClick={() => handleSelectStockClip(v)}
+                      className="cursor-pointer group relative rounded-xl overflow-hidden bg-slate-800 border border-slate-700 hover:border-cyan-400 transition-all"
+                    >
+                      <div className="aspect-video bg-slate-950 relative">
+                        <img src={v.preview} alt={v.title} className="w-full h-full object-cover" />
+                        <span className="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-black/75 text-[9px] font-bold uppercase text-cyan-300">
+                          {v.source}
+                        </span>
+                        <span className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/75 text-[9px] font-mono text-slate-200">
+                          {v.duration}s
+                        </span>
+                      </div>
+                      <div className="p-2.5 bg-slate-900/90 text-xs">
+                        <p className="font-semibold text-white truncate">{v.title}</p>
+                        <p className="text-[10px] text-slate-400 truncate">
+                          By {v.photographer} • {v.license || 'Commercial Free'}
+                        </p>
+                      </div>
+                      <div className="absolute inset-0 bg-cyan-500/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span className="px-3 py-1 rounded bg-cyan-500 text-slate-950 font-bold text-xs">
+                          Select Video
+                        </span>
+                      </div>
                     </div>
-                    <div className="p-2.5 bg-slate-900/90 text-xs">
-                      <p className="font-semibold text-white truncate">{v.title}</p>
-                      <p className="text-[11px] text-slate-400">By {v.photographer}</p>
+                  ))}
+                  {stockHasMore && (
+                    <div className="col-span-full flex justify-center pt-2">
+                      <button
+                        disabled={stockLoading}
+                        onClick={() => handleSearchStock(stockPage + 1)}
+                        className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 text-xs font-bold border border-slate-700 disabled:opacity-50"
+                      >
+                        {stockLoading ? 'Loading...' : 'Load More Footage'}
+                      </button>
                     </div>
-                    <div className="absolute inset-0 bg-cyan-500/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <span className="px-3 py-1 rounded bg-cyan-500 text-slate-950 font-bold text-xs">
-                        Select Video
-                      </span>
-                    </div>
-                  </div>
-                ))
+                  )}
+                </>
               )}
             </div>
           </div>

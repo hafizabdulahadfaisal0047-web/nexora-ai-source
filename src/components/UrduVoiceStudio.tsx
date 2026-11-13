@@ -1,36 +1,30 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Mic,
-  Volume2,
   Play,
   Pause,
   Square,
   Download,
   Sparkles,
-  Sliders,
-  Copy,
   Check,
-  RotateCcw,
-  RefreshCw,
   FileAudio,
-  Radio,
   AlertCircle,
   CheckCircle,
-  HelpCircle,
-  ArrowRight,
   Film,
+  RefreshCw,
 } from 'lucide-react';
 import {
   UrduVoiceService,
   VoiceOption,
   SpeechSupportInfo,
-  VoiceRecorder,
 } from '../services/audioSynthesizer';
 import { generateSpeechAudio } from '../services/api';
 import { VideoLanguage } from '../types';
 
 interface UrduVoiceStudioProps {
   onLoadVoiceToEditor?: (audioUrl: string, language: VideoLanguage) => void;
+  initialText?: string;
+  initialLanguage?: VideoLanguage;
 }
 
 const SAMPLE_SCRIPTS_BY_LANG: Record<VideoLanguage, { title: string; text: string }[]> = {
@@ -92,28 +86,32 @@ const GEMINI_TTS_VOICES = [
   { id: 'Zephyr', name: 'Zephyr (Warm & Expressive)', gender: 'Female', mood: 'Empathetic & Smooth' },
 ];
 
-export const UrduVoiceStudio: React.FC<UrduVoiceStudioProps> = ({ onLoadVoiceToEditor }) => {
-  const [selectedLanguage, setSelectedLanguage] = useState<VideoLanguage>('urdu');
-  const [text, setText] = useState(SAMPLE_SCRIPTS_BY_LANG.urdu[0].text);
+export const UrduVoiceStudio: React.FC<UrduVoiceStudioProps> = ({
+  onLoadVoiceToEditor,
+  initialText,
+  initialLanguage,
+}) => {
+  const [selectedLanguage, setSelectedLanguage] = useState<VideoLanguage>(initialLanguage || 'urdu');
+  const [text, setText] = useState(initialText || SAMPLE_SCRIPTS_BY_LANG.urdu[0].text);
   const [rate, setRate] = useState(0.95);
   const [pitch, setPitch] = useState(1.0);
   const [volume, setVolume] = useState(1.0);
-  const [copied, setCopied] = useState(false);
 
-  // Gemini AI Voice selection
   const [aiVoiceName, setAiVoiceName] = useState('Kore');
   const [isGeneratingAiTts, setIsGeneratingAiTts] = useState(false);
   const [aiTtsAudioUrl, setAiTtsAudioUrl] = useState<string | null>(null);
+  const [statusNotice, setStatusNotice] = useState<{ type: 'info' | 'error'; text: string } | null>(null);
 
-  // Browser Speech synthesis engine
   const [voiceService, setVoiceService] = useState<UrduVoiceService | null>(null);
   const [playbackState, setPlaybackState] = useState<'idle' | 'playing' | 'paused'>('idle');
   const [voices, setVoices] = useState<VoiceOption[]>([]);
   const [selectedVoiceName, setSelectedVoiceName] = useState<string>('');
   const [supportInfo, setSupportInfo] = useState<SpeechSupportInfo | null>(null);
 
-  const ttsAudioRef = useRef<HTMLAudioElement | null>(null);
-  const [isAiAudioPlaying, setIsAiAudioPlaying] = useState(false);
+  useEffect(() => {
+    if (initialLanguage) setSelectedLanguage(initialLanguage);
+    if (initialText) setText(initialText);
+  }, [initialText, initialLanguage]);
 
   useEffect(() => {
     const service = new UrduVoiceService((newState) => {
@@ -138,13 +136,9 @@ export const UrduVoiceStudio: React.FC<UrduVoiceStudioProps> = ({ onLoadVoiceToE
     return () => {
       clearTimeout(timer);
       service.stop();
-      if (aiTtsAudioUrl) {
-        URL.revokeObjectURL(aiTtsAudioUrl);
-      }
     };
   }, [selectedLanguage]);
 
-  // Handle language switch
   const handleLanguageChange = (lang: VideoLanguage) => {
     setSelectedLanguage(lang);
     const samples = SAMPLE_SCRIPTS_BY_LANG[lang] || SAMPLE_SCRIPTS_BY_LANG.urdu;
@@ -154,7 +148,6 @@ export const UrduVoiceStudio: React.FC<UrduVoiceStudioProps> = ({ onLoadVoiceToE
     setAiTtsAudioUrl(null);
   };
 
-  // Browser speech handlers
   const handlePlay = () => {
     if (!voiceService) return;
 
@@ -186,25 +179,27 @@ export const UrduVoiceStudio: React.FC<UrduVoiceStudioProps> = ({ onLoadVoiceToE
     setPlaybackState('idle');
   };
 
-  // Server Gemini 3.8 Flash Lite TTS Studio Voice
   const handleGenerateAiStudioTts = async () => {
     if (!text.trim()) return;
     setIsGeneratingAiTts(true);
     setAiTtsAudioUrl(null);
+    setStatusNotice(null);
 
     try {
       const res = await generateSpeechAudio(text, aiVoiceName, selectedLanguage, rate);
       if (res.success && res.dataUri) {
         setAiTtsAudioUrl(res.dataUri);
-        // Instant test playback
         const audio = new Audio(res.dataUri);
         audio.volume = volume;
         audio.play().catch(() => {});
       } else {
-        alert('Server generated speech synthesis fallback audio.');
+        setStatusNotice({
+          type: 'error',
+          text: res.error || 'Server TTS did not return an audio stream. Use the Web Speech preview button on the left.',
+        });
       }
     } catch (e: any) {
-      alert(`TTS error: ${e.message}`);
+      setStatusNotice({ type: 'error', text: `TTS error: ${e.message}` });
     } finally {
       setIsGeneratingAiTts(false);
     }
@@ -222,13 +217,30 @@ export const UrduVoiceStudio: React.FC<UrduVoiceStudioProps> = ({ onLoadVoiceToE
             <span>AI VOICE GENERATOR &amp; TTS STUDIO (صوتی تخلیق کار)</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-            Authentic Multi-Language Urdu &amp; Global AI Voices
+            Multi-Language Urdu &amp; Global Voice Engine
           </h1>
           <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-            Generate authentic Urdu documentary narration, classical Arabic bayan recitation, and English case study voiceovers. Includes Gemini 3.8 Flash Lite studio WAV audio generation and browser speech synthesis.
+            Synthesize documentary narration in Urdu, English, Roman Urdu, Arabic, and Hindi. Audition via native
+            browser voices or render 24kHz broadcast WAV audio via Gemini 3.8 Flash-Lite TTS.
           </p>
         </div>
       </div>
+
+      {statusNotice && (
+        <div className="p-3.5 rounded-2xl bg-amber-950/50 border border-amber-500/40 text-amber-200 text-xs flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-amber-400" />
+          <span>{statusNotice.text}</span>
+        </div>
+      )}
+
+      {supportInfo && !supportInfo.hasUrduVoice && selectedLanguage === 'urdu' && (
+        <div className="p-3.5 rounded-2xl bg-slate-900 border border-amber-500/30 text-xs text-amber-200 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+          <span>
+            No local Urdu system voice detected in browser SpeechSynthesis — use the Studio WAV Generator on the right for real Gemini Urdu speech output.
+          </span>
+        </div>
+      )}
 
       {/* Main Studio Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -240,7 +252,6 @@ export const UrduVoiceStudio: React.FC<UrduVoiceStudioProps> = ({ onLoadVoiceToE
                 VOICEOVER SCRIPT TO SYNTHESIZE
               </label>
 
-              {/* Language Selector */}
               <div className="flex items-center gap-2">
                 <span className="text-xs text-slate-400">Language:</span>
                 <select
@@ -253,6 +264,7 @@ export const UrduVoiceStudio: React.FC<UrduVoiceStudioProps> = ({ onLoadVoiceToE
                   <option value="roman_urdu">Roman Urdu</option>
                   <option value="arabic">العربية (Arabic)</option>
                   <option value="hindi">हिन्दी (Hindi)</option>
+                  <option value="bilingual">Bilingual</option>
                 </select>
               </div>
             </div>
@@ -267,7 +279,6 @@ export const UrduVoiceStudio: React.FC<UrduVoiceStudioProps> = ({ onLoadVoiceToE
               }`}
             />
 
-            {/* Sample Prompts for this language */}
             <div className="flex flex-wrap items-center gap-2 pt-1">
               <span className="text-xs text-slate-400 font-semibold mr-1">Sample Scripts:</span>
               {(SAMPLE_SCRIPTS_BY_LANG[selectedLanguage] || []).map((s, idx) => (
@@ -281,11 +292,10 @@ export const UrduVoiceStudio: React.FC<UrduVoiceStudioProps> = ({ onLoadVoiceToE
               ))}
             </div>
 
-            {/* Vocal Parameters */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-slate-800">
               <div className="space-y-1.5">
                 <div className="flex justify-between text-xs">
-                  <span className="text-slate-400">Speech Rate / Speed:</span>
+                  <span className="text-slate-400">Speech Speed:</span>
                   <span className="font-mono text-cyan-400 font-bold">{rate.toFixed(2)}x</span>
                 </div>
                 <input
@@ -332,7 +342,6 @@ export const UrduVoiceStudio: React.FC<UrduVoiceStudioProps> = ({ onLoadVoiceToE
               </div>
             </div>
 
-            {/* Play, Pause & Stop Controls */}
             <div className="pt-4 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <button
@@ -340,7 +349,7 @@ export const UrduVoiceStudio: React.FC<UrduVoiceStudioProps> = ({ onLoadVoiceToE
                   className="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs flex items-center gap-2 transition-all shadow-md shadow-cyan-950/40"
                 >
                   <Play className="w-4 h-4 fill-slate-950" />
-                  <span>{playbackState === 'paused' ? 'Resume Speech' : 'Play Preview'}</span>
+                  <span>{playbackState === 'paused' ? 'Resume' : 'Play Browser Preview'}</span>
                 </button>
 
                 <button
@@ -360,7 +369,6 @@ export const UrduVoiceStudio: React.FC<UrduVoiceStudioProps> = ({ onLoadVoiceToE
                 </button>
               </div>
 
-              {/* Native Voice Dropdown */}
               <div className="flex items-center gap-2 text-xs">
                 <span className="text-slate-400">Voice:</span>
                 <select
@@ -387,19 +395,14 @@ export const UrduVoiceStudio: React.FC<UrduVoiceStudioProps> = ({ onLoadVoiceToE
                 <Sparkles className="w-4 h-4" />
                 <span>AI Studio Master Voice (.WAV)</span>
               </div>
-              <h3 className="text-base font-extrabold text-white">
-                Generate Studio-Grade WAV Voice File
-              </h3>
+              <h3 className="text-base font-extrabold text-white">Generate Studio-Grade WAV Voice File</h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Uses Google Gemini 3.8 Flash Lite TTS to generate a broadcast 24kHz lossless WAV narration file.
+                Uses Gemini 3.8 Flash-Lite TTS server proxy to generate 24kHz PCM WAV speech audio.
               </p>
             </div>
 
-            {/* AI Voice Selection */}
             <div className="space-y-2">
-              <label className="text-[11px] font-bold text-slate-400 uppercase">
-                Select Persona &amp; Cadence
-              </label>
+              <label className="text-[11px] font-bold text-slate-400 uppercase">Select Persona &amp; Cadence</label>
               <div className="grid grid-cols-1 gap-2">
                 {GEMINI_TTS_VOICES.map((v) => (
                   <button
@@ -421,7 +424,6 @@ export const UrduVoiceStudio: React.FC<UrduVoiceStudioProps> = ({ onLoadVoiceToE
               </div>
             </div>
 
-            {/* Generate Action Button */}
             <button
               disabled={isGeneratingAiTts || !text.trim()}
               onClick={handleGenerateAiStudioTts}
@@ -440,15 +442,16 @@ export const UrduVoiceStudio: React.FC<UrduVoiceStudioProps> = ({ onLoadVoiceToE
               )}
             </button>
 
-            {/* Generated Audio Card */}
             {aiTtsAudioUrl && (
               <div className="p-4 rounded-2xl bg-black/60 border border-emerald-500/40 space-y-3">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-bold text-emerald-400 flex items-center gap-1.5">
-                    <CheckCircle className="w-4 h-4" /> Ready for Export
+                    <CheckCircle className="w-4 h-4" /> Audio Ready
                   </span>
                   <span className="font-mono text-slate-400 text-[11px]">24kHz WAV</span>
                 </div>
+
+                <audio controls src={aiTtsAudioUrl} className="w-full h-9" />
 
                 <div className="flex items-center justify-between gap-2">
                   <a

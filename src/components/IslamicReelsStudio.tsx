@@ -21,9 +21,15 @@ import {
   Send,
   Video,
   Download,
+  AlertCircle,
 } from 'lucide-react';
-import { IslamicReelPlan, Project, Scene } from '../types';
-import { generateIslamicReel, getCuratedVideos } from '../services/api';
+import { IslamicReelPlan, Project, Scene, StockVideo } from '../types';
+import {
+  generateIslamicReel,
+  getCuratedVideos,
+  searchUnifiedMedia,
+  recordExportHistory,
+} from '../services/api';
 import { UrduVoiceService } from '../services/audioSynthesizer';
 import { VideoRenderer, downloadVideoFile } from '../services/videoRenderer';
 
@@ -82,36 +88,68 @@ export const IslamicReelsStudio: React.FC<IslamicReelsStudioProps> = ({
   const [exportProgress, setExportProgress] = useState(0);
   const [exportStatus, setExportStatus] = useState('');
   const [exportedUrl, setExportedUrl] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleGenerate = async (selectedTopic?: string) => {
     const query = selectedTopic || topic;
     if (!query.trim()) return;
 
     setLoading(true);
+    setErrorMsg(null);
     try {
       const res = await generateIslamicReel(query, voiceoverType);
       const generatedPlan = res.data;
 
-      // Enhance scenes with curated Islamic visuals
-      const stockRes = await getCuratedVideos('islamic');
-      const visuals = stockRes.videos;
+      // Match unique vertical spiritual visuals with attribution
+      const curatedRes = await getCuratedVideos('islamic');
+      const curatedVisuals = curatedRes.videos || [];
+      const usedUrls: string[] = [];
+      const enhancedScenes = [];
 
-      const enhancedScenes = generatedPlan.scenes.map((scene, idx) => {
-        const visual = visuals[idx % visuals.length];
-        return {
+      for (let idx = 0; idx < generatedPlan.scenes.length; idx++) {
+        const scene = generatedPlan.scenes[idx];
+        const searchKw = scene.stockSearchQuery || scene.visualDescription || 'mosque night sky lantern';
+        let chosen: StockVideo | null = null;
+        try {
+          const mediaRes = await searchUnifiedMedia({
+            query: searchKw,
+            orientation: 'portrait',
+            perPage: 5,
+            excludeUrls: usedUrls,
+          });
+          chosen = mediaRes.videos.find((v) => !usedUrls.includes(v.videoUrl)) || mediaRes.videos[0] || null;
+        } catch {
+          chosen = null;
+        }
+
+        if (!chosen && curatedVisuals.length > 0) {
+          chosen =
+            curatedVisuals.find((v) => !usedUrls.includes(v.videoUrl)) ||
+            curatedVisuals[idx % curatedVisuals.length];
+        }
+
+        if (chosen?.videoUrl) usedUrls.push(chosen.videoUrl);
+
+        enhancedScenes.push({
           ...scene,
-          videoUrl: visual?.videoUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4',
+          videoUrl:
+            chosen?.videoUrl ||
+            'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4',
           previewUrl:
-            visual?.preview ||
+            chosen?.preview ||
             'https://images.unsplash.com/photo-1564769625905-50e93615e769?w=800&auto=format&fit=crop&q=80',
-        };
-      });
+          sourceProvider: chosen?.source || 'curated',
+          photographer: chosen?.photographer || 'Curated Archive',
+          license: chosen?.license || 'CC0 / Royalty-Free',
+          attributionText: chosen?.attributionText,
+        });
+      }
 
       generatedPlan.scenes = enhancedScenes as any;
       setPlan(generatedPlan);
       setCurrentSceneIdx(0);
     } catch (e: any) {
-      alert(`Generation notice: ${e.message}`);
+      setErrorMsg(e.message || 'Error generating Islamic Reel plan.');
     } finally {
       setLoading(false);
     }
@@ -161,6 +199,7 @@ export const IslamicReelsStudio: React.FC<IslamicReelsStudioProps> = ({
     if (!plan && !uploadedVideoUrl) return;
 
     setIsExporting(true);
+    setErrorMsg(null);
     setExportProgress(0);
     setExportStatus('Preparing 9:16 vertical video renderer...');
 
@@ -178,6 +217,10 @@ export const IslamicReelsStudio: React.FC<IslamicReelsStudioProps> = ({
         englishSubtitle: '',
         durationSeconds: s.durationSeconds || 8,
         transition: 'fade',
+        sourceProvider: uploadedVideoUrl ? 'upload' : (s as any).sourceProvider || 'curated',
+        photographer: (s as any).photographer,
+        license: (s as any).license,
+        attributionText: (s as any).attributionText,
       })) || [
         {
           id: 'custom_1',
@@ -191,6 +234,7 @@ export const IslamicReelsStudio: React.FC<IslamicReelsStudioProps> = ({
           englishSubtitle: '',
           durationSeconds: 15,
           transition: 'fade',
+          sourceProvider: 'upload',
         },
       ];
 
@@ -198,7 +242,8 @@ export const IslamicReelsStudio: React.FC<IslamicReelsStudioProps> = ({
         scenes: scenesToRender,
         aspectRatio: '9:16',
         resolution: '1080p',
-        bgMusicTrack: 'Peaceful Spiritual Ambient Drone',
+        primaryLanguage: plan?.primaryLanguage || 'urdu',
+        bgMusicTrack: 'Madinah Night Serenity',
         bgMusicVolume: 0.25,
         voiceoverUrl: uploadedVoiceUrl || undefined,
         voiceoverVolume: 0.95,
@@ -209,13 +254,20 @@ export const IslamicReelsStudio: React.FC<IslamicReelsStudioProps> = ({
         },
       });
 
+      if (!result.hasVerifiedAudio) {
+        throw new Error('Rendered reel failed audio track verification. No silent exports allowed.');
+      }
+
       setExportedUrl(result.url);
 
-      // Save project
+      // Save project & record export history
+      const reelId = `reel_${Date.now()}`;
+      const reelTitle = plan?.title || 'Islamic 9:16 Reel';
       const proj: Project = {
-        id: `reel_${Date.now()}`,
-        title: plan?.title || 'Islamic 9:16 Reel',
+        id: reelId,
+        title: reelTitle,
         type: 'islamic_reel',
+        primaryLanguage: plan?.primaryLanguage || 'urdu',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         aspectRatio: '9:16',
@@ -224,8 +276,19 @@ export const IslamicReelsStudio: React.FC<IslamicReelsStudioProps> = ({
         exportedVideoUrl: result.url,
       };
       onSaveProject(proj);
+
+      recordExportHistory({
+        projectId: reelId,
+        projectTitle: reelTitle,
+        platformTarget: 'Instagram Reels 9:16',
+        resolution: '1080p',
+        mimeType: result.mimeType,
+        durationSeconds: Math.round(result.durationSeconds),
+        fileSizeBytes: result.fileSizeBytes,
+        hasVerifiedAudio: result.hasVerifiedAudio,
+      }).catch(() => {});
     } catch (e: any) {
-      alert(`Export notice: ${e.message}`);
+      setErrorMsg(e.message || 'Reel rendering failed.');
     } finally {
       setIsExporting(false);
     }
@@ -373,6 +436,16 @@ export const IslamicReelsStudio: React.FC<IslamicReelsStudioProps> = ({
           </div>
         </div>
       </div>
+
+      {errorMsg && (
+        <div className="p-4 rounded-2xl bg-rose-950/30 border border-rose-500/40 text-xs text-rose-200 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+          <button onClick={() => setErrorMsg(null)} className="text-rose-300 hover:text-white font-bold">Dismiss</button>
+        </div>
+      )}
 
       {/* Reel Studio Interactive Workspace */}
       {(plan || uploadedVideoUrl) && (

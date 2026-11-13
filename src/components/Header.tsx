@@ -143,16 +143,21 @@ export const Header: React.FC<HeaderProps> = ({
         {/* API Status Badge */}
         <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs text-slate-300">
           <div className="flex items-center gap-1.5">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
+            <span
+              className={`inline-flex rounded-full h-2 w-2 ${
+                systemStatus?.hasGemini ? 'bg-cyan-400' : 'bg-amber-400'
+              }`}
+            />
+            <span className="font-medium text-slate-300">
+              {systemStatus?.hasGemini ? 'Gemini 4 AI' : 'Fallback Ready'}
             </span>
-            <span className="font-medium text-slate-300">Gemini 3.8</span>
           </div>
           <span className="text-slate-700">|</span>
           <div className="flex items-center gap-1.5 text-slate-400">
-            <span>Pexels:</span>
-            <span className="text-emerald-400 font-medium">Ready</span>
+            <span>Stock Media:</span>
+            <span className="text-emerald-400 font-medium">
+              {systemStatus?.hasPexels || systemStatus?.hasPixabay ? 'Live API' : 'Archive Ready'}
+            </span>
           </div>
         </div>
 

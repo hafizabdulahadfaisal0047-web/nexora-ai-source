@@ -13,6 +13,7 @@ import {
   Radio,
   Clock,
   ArrowRight,
+  AlertCircle,
 } from 'lucide-react';
 import { BgmCategory } from '../types';
 import {
@@ -47,6 +48,7 @@ export const MusicStudio: React.FC<MusicStudioProps> = ({ onSelectMusicForProjec
   const [fadeInSeconds, setFadeInSeconds] = useState<number>(1.5);
   const [fadeOutSeconds, setFadeOutSeconds] = useState<number>(2.0);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Live Web Audio Preview Controller
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -146,7 +148,7 @@ export const MusicStudio: React.FC<MusicStudioProps> = ({ onSelectMusicForProjec
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (err: any) {
-      alert(`Download note: ${err.message}`);
+      setErrorMsg(err.message || 'Unable to generate downloadable WAV track.');
     } finally {
       setDownloadingId(null);
     }
@@ -174,6 +176,16 @@ export const MusicStudio: React.FC<MusicStudioProps> = ({ onSelectMusicForProjec
           </p>
         </div>
       </div>
+
+      {errorMsg && (
+        <div className="p-4 rounded-2xl bg-rose-950/30 border border-rose-500/40 text-xs text-rose-200 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+          <button onClick={() => setErrorMsg(null)} className="text-rose-300 hover:text-white font-bold">Dismiss</button>
+        </div>
+      )}
 
       {/* Global Volume & Auto-Ducking Controls */}
       <div className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 shadow-xl space-y-4">

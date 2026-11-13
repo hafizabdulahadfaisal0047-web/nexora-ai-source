@@ -20,7 +20,7 @@ import { SoundEffectsStudio } from './components/SoundEffectsStudio';
 import { SubtitleStudio } from './components/SubtitleStudio';
 import { VoiceRecorderStudio } from './components/VoiceRecorderStudio';
 import { ContentEngineStudio } from './components/ContentEngineStudio';
-import { Project } from './types';
+import { Project, VideoLanguage } from './types';
 import { ProjectStore } from './services/projectStore';
 import { fetchSystemStatus, SystemStatus } from './services/api';
 
@@ -30,14 +30,12 @@ export default function App() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
-  const [customPexelsKey, setCustomPexelsKey] = useState<string>(() => {
-    return localStorage.getItem('nexora_pexels_api_key') || '';
-  });
 
   // Cross-studio workflow states
   const [sharedTopic, setSharedTopic] = useState('');
   const [sharedHook, setSharedHook] = useState('');
   const [sharedScript, setSharedScript] = useState('');
+  const [sharedLanguage, setSharedLanguage] = useState<VideoLanguage>('urdu');
 
   const refreshProjects = () => {
     const list = ProjectStore.getProjects();
@@ -48,11 +46,6 @@ export default function App() {
     refreshProjects();
     fetchSystemStatus().then(setSystemStatus).catch(console.error);
   }, []);
-
-  const handleSavePexelsKey = (key: string) => {
-    setCustomPexelsKey(key);
-    localStorage.setItem('nexora_pexels_api_key', key);
-  };
 
   const handleSaveProject = (project: Project) => {
     ProjectStore.saveProject(project);
@@ -136,8 +129,10 @@ export default function App() {
 
           {currentTab === 'content_engine' && (
             <ContentEngineStudio
-              onSendToScriptWriter={(topic: string) => {
+              onSendToScriptWriter={(topic: string, language: VideoLanguage, hook?: string) => {
                 setSharedTopic(topic);
+                setSharedLanguage(language);
+                if (hook) setSharedHook(hook);
                 setCurrentTab('script_writer');
               }}
               onSendToDocumentary={(topic: string) => {
@@ -159,7 +154,8 @@ export default function App() {
             <CompleteVideoMakerStudio
               onLoadIntoEditor={handleLoadIntoEditor}
               onSaveProject={handleSaveProject}
-              customPexelsKey={customPexelsKey}
+              initialTopic={sharedTopic}
+              initialHook={sharedHook}
             />
           )}
 
@@ -167,7 +163,7 @@ export default function App() {
             <BusinessDocumentaryStudio
               onLoadIntoEditor={handleLoadIntoEditor}
               onSaveProject={handleSaveProject}
-              customPexelsKey={customPexelsKey}
+              initialTopic={sharedTopic}
             />
           )}
 
@@ -180,14 +176,16 @@ export default function App() {
 
           {currentTab === 'hook_designer' && (
             <HookDesignerStudio
-              onSendToScriptWriter={(hookText, topic) => {
+              onSendToScriptWriter={(hookText, topic, language) => {
                 setSharedTopic(topic);
                 setSharedHook(hookText);
+                setSharedLanguage(language);
                 setCurrentTab('script_writer');
               }}
-              onSendToCompleteMaker={(hookText, topic) => {
+              onSendToCompleteMaker={(hookText, topic, language) => {
                 setSharedTopic(topic);
                 setSharedHook(hookText);
+                setSharedLanguage(language);
                 setCurrentTab('complete_video_maker');
               }}
             />
@@ -196,16 +194,22 @@ export default function App() {
           {currentTab === 'script_writer' && (
             <ScriptWriterStudio
               onLoadIntoEditor={handleLoadIntoEditor}
-              onOpenVoiceStudio={() => setCurrentTab('urdu_voice')}
+              onOpenVoiceStudio={(text?: string, language?: VideoLanguage) => {
+                if (text) setSharedScript(text);
+                if (language) setSharedLanguage(language);
+                setCurrentTab('urdu_voice');
+              }}
               initialTopic={sharedTopic}
               initialHook={sharedHook}
+              initialLanguage={sharedLanguage}
             />
           )}
 
           {currentTab === 'script_improver' && (
             <ScriptImproverStudio
-              onSendToVoiceGenerator={(text: string) => {
+              onSendToVoiceGenerator={(text: string, language: VideoLanguage) => {
                 setSharedScript(text);
+                setSharedLanguage(language);
                 setCurrentTab('urdu_voice');
               }}
               onSendToVideoEditor={() => {
@@ -230,7 +234,15 @@ export default function App() {
             />
           )}
 
-          {currentTab === 'urdu_voice' && <UrduVoiceStudio />}
+          {currentTab === 'urdu_voice' && (
+            <UrduVoiceStudio
+              initialText={sharedScript}
+              initialLanguage={sharedLanguage}
+              onLoadVoiceToEditor={() => {
+                setCurrentTab('video_editor');
+              }}
+            />
+          )}
 
           {currentTab === 'voice_recorder' && (
             <VoiceRecorderStudio
@@ -265,7 +277,6 @@ export default function App() {
             <VideoEditorStudio
               currentProject={editingProject}
               onSaveProject={handleSaveProject}
-              customPexelsKey={customPexelsKey}
             />
           )}
 
@@ -277,9 +288,7 @@ export default function App() {
             />
           )}
 
-          {currentTab === 'thumbnail_generator' && (
-            <ThumbnailGeneratorStudio customPexelsKey={customPexelsKey} />
-          )}
+          {currentTab === 'thumbnail_generator' && <ThumbnailGeneratorStudio />}
 
           {currentTab === 'youtube_seo' && <YoutubeSeoStudio />}
 
@@ -295,13 +304,7 @@ export default function App() {
             />
           )}
 
-          {currentTab === 'settings' && (
-            <SettingsStudio
-              customPexelsKey={customPexelsKey}
-              onSavePexelsKey={handleSavePexelsKey}
-              systemStatus={systemStatus}
-            />
-          )}
+          {currentTab === 'settings' && <SettingsStudio systemStatus={systemStatus} />}
         </main>
       </div>
     </div>

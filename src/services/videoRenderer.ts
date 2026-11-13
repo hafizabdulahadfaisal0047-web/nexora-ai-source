@@ -1,4 +1,4 @@
-import { AspectRatio, Resolution, Scene } from '../types';
+import { AspectRatio, Resolution, Scene, VideoLanguage } from '../types';
 import {
   generateSoundtrackBuffer,
   generateTransitionSfxBuffer,
@@ -11,6 +11,9 @@ export interface RenderOptions {
   scenes: Scene[];
   aspectRatio: AspectRatio;
   resolution: Resolution;
+  primaryLanguage?: VideoLanguage;
+  voiceName?: string;
+  voiceSpeed?: number;
   bgMusicTrack?: string;
   bgMusicUrl?: string;
   bgMusicVolume?: number;
@@ -54,6 +57,9 @@ export class VideoRenderer {
       scenes,
       aspectRatio,
       resolution,
+      primaryLanguage = 'urdu',
+      voiceName = 'Kore',
+      voiceSpeed = 1.0,
       bgMusicTrack = 'Cinematic Tension',
       bgMusicUrl,
       bgMusicVolume = 0.35,
@@ -142,12 +148,18 @@ export class VideoRenderer {
         sceneVoiceBuffers.push(null);
         sceneEffectiveDurations.push(configuredDur);
       } else {
-        const textToSpeak = scene.urduNarration || scene.title || '';
+        const textToSpeak = scene.urduNarration || scene.englishSubtitle || scene.title || '';
         try {
-          const res = await synthesizeAndMeasureVoiceBuffer(audioCtx, textToSpeak, configuredDur, 'urdu');
+          const res = await synthesizeAndMeasureVoiceBuffer(
+            audioCtx,
+            textToSpeak,
+            configuredDur,
+            primaryLanguage,
+            voiceName,
+            voiceSpeed
+          );
           sceneVoiceBuffers.push(res.buffer);
 
-          // If auto-sync is active and speech exists, snap scene duration to spoken audio + 450ms natural transition cadence
           if (autoSyncSpeechGaps && res.exactDurationSeconds > 0) {
             const syncedDur = Math.max(2.5, Math.round((res.exactDurationSeconds + 0.45) * 10) / 10);
             sceneEffectiveDurations.push(syncedDur);
@@ -739,19 +751,28 @@ export class VideoRenderer {
 
   private async loadSceneMedia(scene: Scene): Promise<HTMLVideoElement | HTMLImageElement> {
     const targetUrl = scene.videoUrl || scene.previewUrl;
+    const isVideoAsset =
+      Boolean(targetUrl) &&
+      (scene.isCustomUpload ||
+        targetUrl.startsWith('blob:') ||
+        /\.mp4(\?|$)/i.test(targetUrl) ||
+        /\.webm(\?|$)/i.test(targetUrl) ||
+        targetUrl.includes('/video-files/') ||
+        targetUrl.includes('pixabay.com/video'));
 
-    if (scene.videoUrl && scene.videoUrl.endsWith('.mp4')) {
+    if (isVideoAsset && targetUrl) {
       return new Promise((resolve) => {
         const video = document.createElement('video');
         video.crossOrigin = 'anonymous';
-        video.src = scene.videoUrl;
+        video.src = targetUrl;
         video.muted = true;
         video.playsInline = true;
+        video.loop = true;
         video.preload = 'auto';
 
         const timeout = setTimeout(() => {
           this.loadFallbackImage(scene.previewUrl).then(resolve);
-        }, 5000);
+        }, 6000);
 
         video.onloadeddata = () => {
           clearTimeout(timeout);
@@ -765,7 +786,7 @@ export class VideoRenderer {
       });
     }
 
-    return this.loadFallbackImage(scene.previewUrl);
+    return this.loadFallbackImage(scene.previewUrl || targetUrl);
   }
 
   private loadFallbackImage(url?: string): Promise<HTMLImageElement> {

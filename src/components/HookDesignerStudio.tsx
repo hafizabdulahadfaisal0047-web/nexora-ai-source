@@ -9,15 +9,11 @@ import {
   Film,
   Volume2,
   FileText,
-  Sliders,
-  Eye,
   Bookmark,
-  Share2,
   AlertCircle,
-  HelpCircle,
 } from 'lucide-react';
 import { HookDesignResult, HookItem, VideoLanguage } from '../types';
-import { generateHooks } from '../services/api';
+import { generateHooks, saveHookToLibrary } from '../services/api';
 import { generateTransitionSfxBuffer } from '../services/audioEngine';
 
 interface HookDesignerStudioProps {
@@ -44,12 +40,13 @@ export const HookDesignerStudio: React.FC<HookDesignerStudioProps> = ({
   const [tone, setTone] = useState('Curiosity, High Stakes & Investigative');
 
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [result, setResult] = useState<HookDesignResult | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [savedHookIds, setSavedHookIds] = useState<Record<string, boolean>>({});
   const [editingHookId, setEditingHookId] = useState<string | null>(null);
   const [editedOpeningLine, setEditedOpeningLine] = useState('');
 
-  // Audio preview for SFX cues
   const playSfxPreview = async (sfxName: string) => {
     try {
       const AudioCtxClass = window.AudioContext || (window as any).webkitAudioContext;
@@ -72,6 +69,8 @@ export const HookDesignerStudio: React.FC<HookDesignerStudioProps> = ({
     if (!activeTopic.trim()) return;
 
     setLoading(true);
+    setErrorMsg(null);
+    setSavedHookIds({});
     try {
       const res = await generateHooks({
         topic: activeTopic,
@@ -83,17 +82,35 @@ export const HookDesignerStudio: React.FC<HookDesignerStudioProps> = ({
       });
       setResult(res.data);
     } catch (err: any) {
-      alert(`Notice: ${err.message || 'Error generating hooks'}`);
+      setErrorMsg(err.message || 'Error generating hooks');
     } finally {
       setLoading(false);
     }
   };
 
   const handleCopy = (hook: HookItem) => {
-    const textToCopy = `[HOOK: ${hook.hookType.toUpperCase()}]\n"${hook.openingLine}"\n\n📌 First 3s Action: ${hook.first3SecondsAction}\n🎬 Suggested Visual: ${hook.suggestedFootage}\n🎙️ Voice Delivery: ${hook.voicePacingStyle}\n🔊 SFX: ${hook.soundEffectCue}\n📺 On-Screen Text: ${hook.onScreenText}`;
+    const textToCopy = `[HOOK: ${hook.hookType.toUpperCase()}]\n"${hook.openingLine}"\n\nFirst 3s Action: ${hook.first3SecondsAction}\nSuggested Visual: ${hook.suggestedFootage}\nVoice Delivery: ${hook.voicePacingStyle}\nSFX: ${hook.soundEffectCue}\nOn-Screen Text: ${hook.onScreenText}`;
     navigator.clipboard.writeText(textToCopy);
     setCopiedId(hook.id);
     setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleSaveHook = async (hook: HookItem) => {
+    if (!result) return;
+    try {
+      await saveHookToLibrary({
+        topic: result.topic,
+        hookType: hook.hookType,
+        openingLine: hook.openingLine,
+        primaryLanguage: result.primaryLanguage,
+        platform: result.platform,
+        onScreenText: hook.onScreenText,
+        soundEffectCue: hook.soundEffectCue,
+      });
+      setSavedHookIds((prev) => ({ ...prev, [hook.id]: true }));
+    } catch (e: any) {
+      setErrorMsg(`Failed to save hook: ${e.message}`);
+    }
   };
 
   const handleSaveEdit = (hookId: string) => {
@@ -115,24 +132,25 @@ export const HookDesignerStudio: React.FC<HookDesignerStudioProps> = ({
           <div className="space-y-2 max-w-2xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-300 text-xs font-semibold">
               <Zap className="w-3.5 h-3.5 text-purple-400" />
-              <span>ADVANCED HOOK DESIGNER V2 (ہائی ریٹینشن ہکس)</span>
+              <span>ADVANCED HOOK DESIGNER (ہائی ریٹینشن ہکس)</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
               Master the First 3 Seconds. Eliminate Drop-Off.
             </h1>
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-              Generate 10 psychologically distinct hook angles for YouTube, Shorts, Reels, and TikTok. Each hook comes engineered with visual disruption cues, sound effect hits, and delivery pacing.
+              Generate 10 distinct cold-open hook angles for YouTube, Shorts, Reels, and TikTok with visual cues,
+              SFX auditioning, and persistent saving to your Hook Library.
             </p>
           </div>
 
           <div className="flex items-center gap-3">
             <div className="px-4 py-3 rounded-2xl bg-black/40 border border-slate-800 text-center">
               <span className="block text-xl font-mono font-black text-cyan-400">10</span>
-              <span className="text-[10px] text-slate-400 uppercase font-semibold">Unique Angles</span>
+              <span className="text-[10px] text-slate-400 uppercase font-semibold">Hook Styles</span>
             </div>
             <div className="px-4 py-3 rounded-2xl bg-black/40 border border-slate-800 text-center">
-              <span className="block text-xl font-mono font-black text-purple-400">&lt; 3.0s</span>
-              <span className="text-[10px] text-slate-400 uppercase font-semibold">Drop-Off Defense</span>
+              <span className="block text-xl font-mono font-black text-purple-400">1–3s</span>
+              <span className="text-[10px] text-slate-400 uppercase font-semibold">Cold Open</span>
             </div>
           </div>
         </div>
@@ -172,7 +190,13 @@ export const HookDesignerStudio: React.FC<HookDesignerStudioProps> = ({
           </div>
         </div>
 
-        {/* Quick Presets */}
+        {errorMsg && (
+          <div className="p-3 rounded-xl bg-rose-950/50 border border-rose-500/40 text-xs text-rose-200 flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+        )}
+
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-slate-400 font-semibold mr-1">Quick Presets:</span>
           {PRESET_TOPICS.map((p, idx) => (
@@ -190,7 +214,6 @@ export const HookDesignerStudio: React.FC<HookDesignerStudioProps> = ({
           ))}
         </div>
 
-        {/* Multi-parameter Controls */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-slate-800">
           <div>
             <label className="block text-[11px] font-bold text-slate-400 uppercase mb-1.5">
@@ -293,30 +316,43 @@ export const HookDesignerStudio: React.FC<HookDesignerStudioProps> = ({
                 className="p-6 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-purple-500/40 transition-all shadow-xl space-y-4 group flex flex-col justify-between"
               >
                 <div className="space-y-3">
-                  {/* Hook Category & Badges */}
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <span className="px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 font-bold text-[11px] border border-purple-500/30">
-                      #{index + 1} {hook.hookType.toUpperCase()} HOOK
+                      #{index + 1} {hook.hookType.toUpperCase()}
                     </span>
-                    <button
-                      onClick={() => handleCopy(hook)}
-                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors flex items-center gap-1 text-[11px]"
-                    >
-                      {copiedId === hook.id ? (
-                        <>
-                          <Check className="w-3.5 h-3.5 text-emerald-400" />
-                          <span className="text-emerald-400">Copied!</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-3.5 h-3.5" />
-                          <span>Copy Hook</span>
-                        </>
-                      )}
-                    </button>
+
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => handleSaveHook(hook)}
+                        className={`p-1.5 rounded-lg text-[11px] flex items-center gap-1 transition-colors ${
+                          savedHookIds[hook.id]
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                            : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                        }`}
+                      >
+                        <Bookmark className="w-3.5 h-3.5" />
+                        <span>{savedHookIds[hook.id] ? 'Saved' : 'Save Hook'}</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleCopy(hook)}
+                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors flex items-center gap-1 text-[11px]"
+                      >
+                        {copiedId === hook.id ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 text-emerald-400" />
+                            <span className="text-emerald-400">Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>Copy</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Opening Line */}
                   {editingHookId === hook.id ? (
                     <div className="space-y-2">
                       <textarea
@@ -338,7 +374,7 @@ export const HookDesignerStudio: React.FC<HookDesignerStudioProps> = ({
                           onClick={() => handleSaveEdit(hook.id)}
                           className="px-3 py-1 text-xs rounded-lg bg-purple-600 text-white font-bold"
                         >
-                          Save
+                          Save Edit
                         </button>
                       </div>
                     </div>
@@ -361,26 +397,25 @@ export const HookDesignerStudio: React.FC<HookDesignerStudioProps> = ({
                     </div>
                   )}
 
-                  {/* Production Blueprint Specs */}
                   <div className="space-y-2 text-xs pt-1">
                     <div className="flex items-start gap-2 text-slate-300">
-                      <span className="text-purple-400 font-bold shrink-0">⚡ 0-3s Action:</span>
+                      <span className="text-purple-400 font-bold shrink-0">0-3s Action:</span>
                       <span className="text-slate-300">{hook.first3SecondsAction}</span>
                     </div>
 
                     <div className="flex items-start gap-2 text-slate-300">
-                      <span className="text-cyan-400 font-bold shrink-0">🎬 Suggested B-Roll:</span>
+                      <span className="text-cyan-400 font-bold shrink-0">B-Roll:</span>
                       <span className="text-slate-400 italic">{hook.suggestedFootage}</span>
                     </div>
 
                     <div className="flex items-start gap-2 text-slate-300">
-                      <span className="text-amber-400 font-bold shrink-0">🎙️ Delivery:</span>
+                      <span className="text-amber-400 font-bold shrink-0">Delivery:</span>
                       <span className="text-slate-400">{hook.voicePacingStyle}</span>
                     </div>
 
                     <div className="flex items-center justify-between text-slate-300 pt-1">
                       <div className="flex items-center gap-1.5">
-                        <span className="text-rose-400 font-bold">🔊 SFX Hit:</span>
+                        <span className="text-rose-400 font-bold">SFX Hit:</span>
                         <span className="text-slate-300 font-mono text-[11px]">{hook.soundEffectCue}</span>
                       </div>
                       <button
@@ -392,13 +427,12 @@ export const HookDesignerStudio: React.FC<HookDesignerStudioProps> = ({
                     </div>
 
                     <div className="p-2 rounded-lg bg-slate-950/80 border border-slate-800 flex items-center justify-between text-[11px]">
-                      <span className="text-slate-400 font-medium">On-Screen Text Overlay:</span>
+                      <span className="text-slate-400 font-medium">On-Screen Text:</span>
                       <span className="text-cyan-300 font-black tracking-wider uppercase">{hook.onScreenText}</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Workflow Actions */}
                 <div className="pt-4 border-t border-slate-800/80 flex items-center justify-between gap-2">
                   <button
                     onClick={() => onSendToScriptWriter(hook.openingLine, result.topic, result.primaryLanguage)}

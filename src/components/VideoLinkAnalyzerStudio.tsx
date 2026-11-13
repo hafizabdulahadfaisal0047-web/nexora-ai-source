@@ -41,17 +41,19 @@ export const VideoLinkAnalyzerStudio: React.FC<VideoLinkAnalyzerStudioProps> = (
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<LinkAnalysisResult | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleAnalyze = async (targetUrl?: string) => {
     const activeUrl = targetUrl || url;
     if (!activeUrl.trim()) return;
 
     setLoading(true);
+    setErrorMsg(null);
     try {
       const res = await analyzeVideoLink(activeUrl);
       setResult(res.data);
     } catch (err: any) {
-      alert(`Notice: ${err.message || 'Error analyzing link'}`);
+      setErrorMsg(err.message || 'Error analyzing video link.');
     } finally {
       setLoading(false);
     }
@@ -144,6 +146,16 @@ export const VideoLinkAnalyzerStudio: React.FC<VideoLinkAnalyzerStudioProps> = (
             </button>
           ))}
         </div>
+
+        {errorMsg && (
+          <div className="p-3.5 rounded-xl bg-rose-950/30 border border-rose-500/40 text-xs text-rose-200 flex items-center justify-between gap-2">
+            <span className="flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0" />
+              <span>{errorMsg}</span>
+            </span>
+            <button onClick={() => setErrorMsg(null)} className="text-rose-300 hover:text-white font-bold">Dismiss</button>
+          </div>
+        )}
       </div>
 
       {/* Analysis Results Display */}

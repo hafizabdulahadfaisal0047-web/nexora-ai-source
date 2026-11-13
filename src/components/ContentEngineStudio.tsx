@@ -2,27 +2,22 @@ import React, { useState, useEffect } from 'react';
 import {
   Sparkles,
   Calendar,
-  BookOpen,
   Search,
   Copy,
   Check,
-  Filter,
   Plus,
   ArrowRight,
   ShieldCheck,
   AlertTriangle,
   Flame,
-  Clock,
-  Video,
-  FileText,
   RefreshCw,
   Trash2,
   Layers,
   CheckCircle2,
-  TrendingUp,
-  Tag,
-  Send,
   Zap,
+  Bookmark,
+  History,
+  FileText,
 } from 'lucide-react';
 import {
   ContentNiche,
@@ -31,16 +26,25 @@ import {
   DuplicateAuditResult,
   BulkContentPlan,
   VideoLanguage,
+  SavedScriptItem,
+  SavedHookItem,
+  ContentHistoryItem,
 } from '../types';
 import {
   fetchContentTopics,
   fetchDailyIdeas,
   checkTopicDuplicate,
   generateBulkPlan,
+  fetchSavedScripts,
+  deleteSavedScript,
+  fetchSavedHooks,
+  deleteSavedHook,
+  fetchContentHistory,
+  clearContentHistory,
 } from '../services/api';
 
 interface ContentEngineStudioProps {
-  onSendToScriptWriter: (topic: string, language: VideoLanguage) => void;
+  onSendToScriptWriter: (topic: string, language: VideoLanguage, hook?: string) => void;
   onSendToDocumentary: (topic: string) => void;
   onSendToReels: (topic: string) => void;
   onSendToHookDesigner?: (topic: string) => void;
@@ -133,35 +137,36 @@ const INITIAL_CALENDAR_ITEMS: ContentCalendarItem[] = [
 export const ContentEngineStudio: React.FC<ContentEngineStudioProps> = ({
   onSendToScriptWriter,
   onSendToDocumentary,
-  onSendToReels,
-  onSendToHookDesigner,
 }) => {
   const [activeTab, setActiveTab] = useState<
-    'topics' | 'daily' | 'duplicate_audit' | 'bulk_planner' | 'calendar'
+    | 'topics'
+    | 'daily'
+    | 'duplicate_audit'
+    | 'bulk_planner'
+    | 'calendar'
+    | 'saved_scripts'
+    | 'saved_hooks'
+    | 'history'
   >('topics');
 
-  // Topics Generator State
   const [selectedNiche, setSelectedNiche] = useState<ContentNiche>('business_documentaries');
   const [selectedLanguage, setSelectedLanguage] = useState<VideoLanguage>('urdu');
   const [topics, setTopics] = useState<TopicIdea[]>([]);
   const [isGeneratingTopics, setIsGeneratingTopics] = useState(false);
   const [topicsSearchQuery, setTopicsSearchQuery] = useState('');
 
-  // Daily Ideas State
   const [dailyIdeas, setDailyIdeas] = useState<any[]>([]);
   const [isLoadingDaily, setIsLoadingDaily] = useState(false);
 
-  // Duplicate Detection State
   const [candidateTopic, setCandidateTopic] = useState('');
   const [duplicateAudit, setDuplicateAudit] = useState<DuplicateAuditResult | null>(null);
   const [isAuditingDuplicate, setIsAuditingDuplicate] = useState(false);
 
-  // Bulk Planner State
   const [bulkTheme, setBulkTheme] = useState('Global Market Disruptions & Untold Power Battles');
   const [bulkPlan, setBulkPlan] = useState<BulkContentPlan | null>(null);
   const [isGeneratingBulk, setIsGeneratingBulk] = useState(false);
 
-  // Calendar State
+  // Calendar state + inline add form (no window.prompt)
   const [calendarItems, setCalendarItems] = useState<ContentCalendarItem[]>(() => {
     try {
       const saved = localStorage.getItem('nexora_content_calendar');
@@ -170,21 +175,76 @@ export const ContentEngineStudio: React.FC<ContentEngineStudioProps> = ({
       return INITIAL_CALENDAR_ITEMS;
     }
   });
+  const [customCalendarTitle, setCustomCalendarTitle] = useState('');
+  const [customCalendarDate, setCustomCalendarDate] = useState(
+    new Date().toISOString().split('T')[0]
+  );
 
+  // Persistent Libraries State
+  const [librarySearch, setLibrarySearch] = useState('');
+  const [libraryLangFilter, setLibraryLangFilter] = useState<string>('');
+  const [savedScripts, setSavedScripts] = useState<SavedScriptItem[]>([]);
+  const [savedHooks, setSavedHooks] = useState<SavedHookItem[]>([]);
+  const [contentHistory, setContentHistory] = useState<ContentHistoryItem[]>([]);
+  const [loadingLibrary, setLoadingLibrary] = useState(false);
+
+  const [notice, setNotice] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  // Save calendar to localStorage
   useEffect(() => {
     try {
       localStorage.setItem('nexora_content_calendar', JSON.stringify(calendarItems));
     } catch (_) {}
   }, [calendarItems]);
 
-  // Initial load of topics and daily ideas
   useEffect(() => {
     handleGenerateTopics();
     loadDailyIdeas();
   }, []);
+
+  const showNotice = (msg: string) => {
+    setNotice(msg);
+    setTimeout(() => setNotice(null), 3200);
+  };
+
+  const loadSavedScriptsList = async (search = librarySearch, lang = libraryLangFilter) => {
+    setLoadingLibrary(true);
+    try {
+      const res = await fetchSavedScripts(search, lang);
+      if (res.success) setSavedScripts(res.scripts || []);
+    } catch (_) {
+    } finally {
+      setLoadingLibrary(false);
+    }
+  };
+
+  const loadSavedHooksList = async (search = librarySearch, lang = libraryLangFilter) => {
+    setLoadingLibrary(true);
+    try {
+      const res = await fetchSavedHooks(search, lang);
+      if (res.success) setSavedHooks(res.hooks || []);
+    } catch (_) {
+    } finally {
+      setLoadingLibrary(false);
+    }
+  };
+
+  const loadContentHistoryList = async (search = librarySearch) => {
+    setLoadingLibrary(true);
+    try {
+      const res = await fetchContentHistory(search);
+      if (res.success) setContentHistory(res.history || []);
+    } catch (_) {
+    } finally {
+      setLoadingLibrary(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'saved_scripts') loadSavedScriptsList();
+    if (activeTab === 'saved_hooks') loadSavedHooksList();
+    if (activeTab === 'history') loadContentHistoryList();
+  }, [activeTab, librarySearch, libraryLangFilter]);
 
   const handleGenerateTopics = async (nicheOverride?: ContentNiche) => {
     const nicheToUse = nicheOverride || selectedNiche;
@@ -244,12 +304,12 @@ export const ContentEngineStudio: React.FC<ContentEngineStudioProps> = ({
     }
   };
 
-  const handleAddTopicToCalendar = (topic: string, niche: ContentNiche) => {
-    const nextDate = new Date(Date.now() + calendarItems.length * 86400000)
-      .toISOString()
-      .split('T')[0];
+  const handleAddTopicToCalendar = (topic: string, niche: ContentNiche, dateOverride?: string) => {
+    const nextDate =
+      dateOverride ||
+      new Date(Date.now() + calendarItems.length * 86400000).toISOString().split('T')[0];
     const newItem: ContentCalendarItem = {
-      id: `cal-${Date.now()}`,
+      id: `cal-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       date: nextDate,
       title: topic,
       niche,
@@ -258,7 +318,7 @@ export const ContentEngineStudio: React.FC<ContentEngineStudioProps> = ({
       primaryLanguage: selectedLanguage,
     };
     setCalendarItems((prev) => [newItem, ...prev]);
-    alert(`Added "${topic}" to Content Calendar for ${nextDate}!`);
+    showNotice(`Scheduled "${topic}" for ${nextDate}.`);
   };
 
   const handleCopyText = (text: string, id: string) => {
@@ -283,15 +343,14 @@ export const ContentEngineStudio: React.FC<ContentEngineStudioProps> = ({
           <div className="space-y-2">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-xs font-bold">
               <Zap className="w-3.5 h-3.5 text-cyan-400" />
-              <span>UNLIMITED CONTENT ENGINE &amp; CALENDAR (محرکِ مواد)</span>
+              <span>MULTI-NICHE CONTENT ENGINE &amp; LIBRARY (محرکِ مواد)</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-              AI Content Production &amp; Topic Strategy
+              Content Strategy, Saved Vault &amp; Production Calendar
             </h1>
             <p className="text-sm text-slate-300 max-w-2xl leading-relaxed">
-              Generate fresh, high-retention video topics across 8 specialized niches, inspect duplicate
-              similarity before filming, plan bulk weekly content calendars, and bridge directly into Script
-              and Video studios.
+              Generate fresh video ideas across 8 niches, audit topic uniqueness, manage saved scripts and hooks,
+              inspect production history, and schedule weekly video batches.
             </p>
           </div>
 
@@ -309,79 +368,52 @@ export const ContentEngineStudio: React.FC<ContentEngineStudioProps> = ({
               className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs border border-slate-700 flex items-center gap-2 transition-all"
             >
               <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>Check Topic Similarity</span>
+              <span>Duplicate Check</span>
             </button>
           </div>
         </div>
 
         {/* Tab Selector */}
         <div className="flex items-center gap-2 overflow-x-auto pt-6 border-t border-slate-800/80 mt-6 text-xs font-semibold">
-          <button
-            onClick={() => setActiveTab('topics')}
-            className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all whitespace-nowrap ${
-              activeTab === 'topics'
-                ? 'bg-cyan-500 text-slate-950 font-bold shadow'
-                : 'bg-slate-800/70 text-slate-300 hover:text-white'
-            }`}
-          >
-            <Sparkles className="w-4 h-4" />
-            <span>Niche Topic Radar (8 Categories)</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('daily')}
-            className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all whitespace-nowrap ${
-              activeTab === 'daily'
-                ? 'bg-cyan-500 text-slate-950 font-bold shadow'
-                : 'bg-slate-800/70 text-slate-300 hover:text-white'
-            }`}
-          >
-            <Flame className="w-4 h-4 text-amber-400" />
-            <span>Daily Viral Radar</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('duplicate_audit')}
-            className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all whitespace-nowrap ${
-              activeTab === 'duplicate_audit'
-                ? 'bg-cyan-500 text-slate-950 font-bold shadow'
-                : 'bg-slate-800/70 text-slate-300 hover:text-white'
-            }`}
-          >
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>Duplicate &amp; Uniqueness Audit</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('bulk_planner')}
-            className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all whitespace-nowrap ${
-              activeTab === 'bulk_planner'
-                ? 'bg-cyan-500 text-slate-950 font-bold shadow'
-                : 'bg-slate-800/70 text-slate-300 hover:text-white'
-            }`}
-          >
-            <Layers className="w-4 h-4 text-purple-400" />
-            <span>7-Day Bulk Strategy</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('calendar')}
-            className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all whitespace-nowrap ${
-              activeTab === 'calendar'
-                ? 'bg-cyan-500 text-slate-950 font-bold shadow'
-                : 'bg-slate-800/70 text-slate-300 hover:text-white'
-            }`}
-          >
-            <Calendar className="w-4 h-4 text-pink-400" />
-            <span>Content Calendar ({calendarItems.length})</span>
-          </button>
+          {[
+            { id: 'topics', label: 'Niche Topics (8)', icon: Sparkles },
+            { id: 'daily', label: 'Daily Ideas', icon: Flame },
+            { id: 'duplicate_audit', label: 'Duplicate Audit', icon: ShieldCheck },
+            { id: 'bulk_planner', label: '7-Day Planner', icon: Layers },
+            { id: 'calendar', label: `Calendar (${calendarItems.length})`, icon: Calendar },
+            { id: 'saved_scripts', label: 'Saved Scripts', icon: FileText },
+            { id: 'saved_hooks', label: 'Saved Hooks', icon: Bookmark },
+            { id: 'history', label: 'Content History', icon: History },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition-all whitespace-nowrap ${
+                  activeTab === tab.id
+                    ? 'bg-cyan-500 text-slate-950 font-bold shadow'
+                    : 'bg-slate-800/70 text-slate-300 hover:text-white'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
+
+      {notice && (
+        <div className="p-3.5 rounded-2xl bg-emerald-950/50 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          <span>{notice}</span>
+        </div>
+      )}
 
       {/* TAB 1: Niche Topic Radar */}
       {activeTab === 'topics' && (
         <div className="space-y-6">
-          {/* Niche Selector Pills */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
             {NICHES.map((n) => (
               <button
@@ -397,11 +429,7 @@ export const ContentEngineStudio: React.FC<ContentEngineStudioProps> = ({
                 }`}
               >
                 <div className="text-xl mb-1">{n.icon}</div>
-                <h4
-                  className={`text-xs font-bold ${
-                    selectedNiche === n.id ? 'text-cyan-300' : 'text-white'
-                  }`}
-                >
+                <h4 className={`text-xs font-bold ${selectedNiche === n.id ? 'text-cyan-300' : 'text-white'}`}>
                   {n.label}
                 </h4>
                 <p className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">{n.desc}</p>
@@ -409,13 +437,12 @@ export const ContentEngineStudio: React.FC<ContentEngineStudioProps> = ({
             ))}
           </div>
 
-          {/* Filter & Search Bar */}
           <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="relative flex-1 w-full sm:w-auto">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
               <input
                 type="text"
-                placeholder="Search generated ideas by topic, keyword, or tag..."
+                placeholder="Filter generated ideas by keyword or tag..."
                 value={topicsSearchQuery}
                 onChange={(e) => setTopicsSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 outline-none focus:border-cyan-500"
@@ -427,13 +454,14 @@ export const ContentEngineStudio: React.FC<ContentEngineStudioProps> = ({
                 value={selectedLanguage}
                 onChange={(e) => {
                   setSelectedLanguage(e.target.value as VideoLanguage);
-                  handleGenerateTopics();
                 }}
                 className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 outline-none"
               >
                 <option value="urdu">Urdu (اردو)</option>
                 <option value="english">English</option>
                 <option value="roman_urdu">Roman Urdu</option>
+                <option value="arabic">Arabic (العربية)</option>
+                <option value="hindi">Hindi (हिन्दी)</option>
                 <option value="bilingual">Bilingual (Urdu + English)</option>
               </select>
 
@@ -448,16 +476,11 @@ export const ContentEngineStudio: React.FC<ContentEngineStudioProps> = ({
             </div>
           </div>
 
-          {/* Topics Grid */}
           {isGeneratingTopics ? (
             <div className="p-16 text-center rounded-3xl bg-slate-900/40 border border-slate-800 space-y-3">
               <RefreshCw className="w-8 h-8 text-cyan-400 animate-spin mx-auto" />
-              <h3 className="text-sm font-bold text-white">
-                Mining Psychological &amp; High-Retention Topics...
-              </h3>
-              <p className="text-xs text-slate-400">
-                Auditing conflict gaps, virality indicators, and cultural resonance.
-              </p>
+              <h3 className="text-sm font-bold text-white">Generating Original Niche Topics...</h3>
+              <p className="text-xs text-slate-400">Checking topic history to avoid duplicates.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -469,10 +492,10 @@ export const ContentEngineStudio: React.FC<ContentEngineStudioProps> = ({
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 font-mono text-[10px] font-bold">
-                        ★ {item.viralityScore || 92}% Virality Score
+                        Relevance Est: {item.viralityScore || 85}/100
                       </span>
                       <span className="text-[10px] text-slate-400 font-mono">
-                        {item.estimatedDuration || '10-14 mins'}
+                        {item.estimatedDuration || '8-12 mins'}
                       </span>
                     </div>
 
@@ -490,7 +513,7 @@ export const ContentEngineStudio: React.FC<ContentEngineStudioProps> = ({
                     <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800/70 space-y-1">
                       <p className="text-[10px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1">
                         <Flame className="w-3 h-3" />
-                        <span>Curiosity Hook Angle:</span>
+                        <span>Hook Angle:</span>
                       </p>
                       <p className="text-xs text-slate-300 italic leading-relaxed">
                         "{item.viralHookAngle}"
@@ -507,10 +530,7 @@ export const ContentEngineStudio: React.FC<ContentEngineStudioProps> = ({
                     {item.tags && item.tags.length > 0 && (
                       <div className="flex flex-wrap gap-1.5 pt-1">
                         {item.tags.map((tg, i) => (
-                          <span
-                            key={i}
-                            className="px-2 py-0.5 rounded-md bg-slate-800 text-[10px] text-slate-400"
-                          >
+                          <span key={i} className="px-2 py-0.5 rounded-md bg-slate-800 text-[10px] text-slate-400">
                             #{tg}
                           </span>
                         ))}
@@ -518,7 +538,6 @@ export const ContentEngineStudio: React.FC<ContentEngineStudioProps> = ({
                     )}
                   </div>
 
-                  {/* Actions */}
                   <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
                     <div className="flex items-center gap-1.5">
                       <button
@@ -541,15 +560,13 @@ export const ContentEngineStudio: React.FC<ContentEngineStudioProps> = ({
                       </button>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => onSendToScriptWriter(item.title, selectedLanguage)}
-                        className="px-3 py-1.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition-all"
-                      >
-                        <span>Write Script</span>
-                        <ArrowRight className="w-3 h-3" />
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => onSendToScriptWriter(item.title, selectedLanguage)}
+                      className="px-3 py-1.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition-all"
+                    >
+                      <span>Write Script</span>
+                      <ArrowRight className="w-3 h-3" />
+                    </button>
                   </div>
                 </div>
               ))}
@@ -558,7 +575,7 @@ export const ContentEngineStudio: React.FC<ContentEngineStudioProps> = ({
         </div>
       )}
 
-      {/* TAB 2: Daily Viral Radar */}
+      {/* TAB 2: Daily Ideas */}
       {activeTab === 'daily' && (
         <div className="space-y-4">
           <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex items-center justify-between">
@@ -567,9 +584,9 @@ export const ContentEngineStudio: React.FC<ContentEngineStudioProps> = ({
                 <Flame className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-white">Daily Viral Content Prompt Radar</h3>
+                <h3 className="text-sm font-bold text-white">Daily Editorial Topic Suggestions</h3>
                 <p className="text-xs text-slate-400">
-                  Refreshed daily algorithm insights based on trending YouTube documentary analytics
+                  Fresh documentary &amp; educational concepts curated for your studio niches
                 </p>
               </div>
             </div>
@@ -580,7 +597,7 @@ export const ContentEngineStudio: React.FC<ContentEngineStudioProps> = ({
               className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 text-xs font-semibold flex items-center gap-1.5"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isLoadingDaily ? 'animate-spin' : ''}`} />
-              <span>Refresh Daily Feed</span>
+              <span>Refresh Ideas</span>
             </button>
           </div>
 
@@ -592,7 +609,7 @@ export const ContentEngineStudio: React.FC<ContentEngineStudioProps> = ({
               >
                 <div className="flex items-center justify-between">
                   <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold font-mono">
-                    Viral Potential: {idea.viralityScore}%
+                    {idea.niche?.replace('_', ' ')}
                   </span>
                   <span className="text-[10px] text-slate-400">{idea.estimatedDuration}</span>
                 </div>
@@ -600,14 +617,12 @@ export const ContentEngineStudio: React.FC<ContentEngineStudioProps> = ({
                 <div>
                   <h4 className="text-base font-bold text-white leading-snug">{idea.title}</h4>
                   {idea.titleUrdu && (
-                    <p className="font-urdu text-sm text-amber-300 mt-1 text-right">
-                      {idea.titleUrdu}
-                    </p>
+                    <p className="font-urdu text-sm text-amber-300 mt-1 text-right">{idea.titleUrdu}</p>
                   )}
                 </div>
 
                 <p className="text-xs text-slate-300 bg-slate-950 p-3 rounded-xl border border-slate-800 italic">
-                  💡 Hook Angle: "{idea.viralHookAngle}"
+                  Hook Angle: "{idea.viralHookAngle}"
                 </p>
 
                 <div className="pt-2 flex items-center justify-between text-xs">
@@ -633,7 +648,7 @@ export const ContentEngineStudio: React.FC<ContentEngineStudioProps> = ({
         </div>
       )}
 
-      {/* TAB 3: Duplicate & Uniqueness Audit */}
+      {/* TAB 3: Duplicate Audit */}
       {activeTab === 'duplicate_audit' && (
         <div className="max-w-3xl mx-auto space-y-6">
           <div className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800 space-y-4">
@@ -642,23 +657,19 @@ export const ContentEngineStudio: React.FC<ContentEngineStudioProps> = ({
                 <ShieldCheck className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-white">
-                  Duplicate Topic &amp; Idea Similarity Auditor
-                </h3>
+                <h3 className="text-base font-bold text-white">Duplicate Topic Similarity Checker</h3>
                 <p className="text-xs text-slate-400">
-                  Inspect candidate video topics before scripting to prevent repetitive content or cannibalized views.
+                  Compares your proposed topic against your persistent topic and script history to avoid overlap.
                 </p>
               </div>
             </div>
 
             <div className="space-y-2 pt-2">
-              <label className="block text-xs font-semibold text-slate-300">
-                ENTER PROPOSED TOPIC OR TITLE
-              </label>
+              <label className="block text-xs font-semibold text-slate-300">ENTER PROPOSED TOPIC</label>
               <div className="flex items-center gap-3">
                 <input
                   type="text"
-                  placeholder="e.g. How Luxottica controls the worldwide eyeglass market..."
+                  placeholder="e.g. How ASML controls extreme ultraviolet lithography..."
                   value={candidateTopic}
                   onChange={(e) => setCandidateTopic(e.target.value)}
                   className="flex-1 px-4 py-3 rounded-2xl bg-slate-950 border border-slate-800 text-sm text-white placeholder-slate-500 outline-none focus:border-cyan-400"
@@ -668,18 +679,13 @@ export const ContentEngineStudio: React.FC<ContentEngineStudioProps> = ({
                   disabled={isAuditingDuplicate || !candidateTopic.trim()}
                   className="px-5 py-3 rounded-2xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-lg transition-all disabled:opacity-40"
                 >
-                  {isAuditingDuplicate ? (
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <ShieldCheck className="w-4 h-4" />
-                  )}
-                  <span>Audit Uniqueness</span>
+                  {isAuditingDuplicate ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                  <span>Check Similarity</span>
                 </button>
               </div>
             </div>
           </div>
 
-          {/* Audit Results */}
           {duplicateAudit && (
             <div
               className={`p-6 rounded-3xl border space-y-4 ${
@@ -694,20 +700,17 @@ export const ContentEngineStudio: React.FC<ContentEngineStudioProps> = ({
                 <div className="flex items-center gap-2">
                   {duplicateAudit.status === 'unique' ? (
                     <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                  ) : duplicateAudit.status === 'borderline' ? (
-                    <AlertTriangle className="w-5 h-5 text-amber-400" />
                   ) : (
-                    <AlertTriangle className="w-5 h-5 text-rose-400" />
+                    <AlertTriangle className="w-5 h-5 text-amber-400" />
                   )}
-                  <h4 className="text-base font-bold text-white capitalize">
+                  <h4 className="text-base font-bold text-white">
                     {duplicateAudit.status === 'unique'
-                      ? '✓ Unique Topic Angle'
+                      ? 'Unique Topic Angle'
                       : duplicateAudit.status === 'borderline'
-                      ? '⚠️ Moderate Overlap Detected'
-                      : '❌ High Duplicate Warning'}
+                      ? 'Moderate Overlap Detected'
+                      : 'High Similarity / Duplicate Warning'}
                   </h4>
                 </div>
-
                 <span className="font-mono text-xs font-bold px-3 py-1 rounded-full bg-slate-950 border border-slate-800 text-white">
                   Overlap: {duplicateAudit.similarityScore}%
                 </span>
@@ -717,7 +720,7 @@ export const ContentEngineStudio: React.FC<ContentEngineStudioProps> = ({
 
               {duplicateAudit.matchedTopic && (
                 <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 text-xs">
-                  <span className="text-slate-400">Closest Match in Catalog: </span>
+                  <span className="text-slate-400">Closest Match in History: </span>
                   <span className="font-semibold text-white">"{duplicateAudit.matchedTopic}"</span>
                 </div>
               )}
@@ -734,7 +737,7 @@ export const ContentEngineStudio: React.FC<ContentEngineStudioProps> = ({
                   onClick={() => onSendToDocumentary(candidateTopic)}
                   className="px-4 py-2 rounded-xl bg-slate-800 text-white text-xs font-semibold"
                 >
-                  Create Full Documentary
+                  Open Documentary Studio
                 </button>
               </div>
             </div>
@@ -748,11 +751,9 @@ export const ContentEngineStudio: React.FC<ContentEngineStudioProps> = ({
           <div className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h3 className="text-base font-bold text-white">
-                  Automated 7-Day Content Roadmap Generator
-                </h3>
+                <h3 className="text-base font-bold text-white">7-Day Content Batch Planner</h3>
                 <p className="text-xs text-slate-400">
-                  Plan a balanced weekly video sequence alternating between investigative documentaries and viral shorts.
+                  Plan a balanced weekly video sequence alternating between documentaries and short reels.
                 </p>
               </div>
 
@@ -762,15 +763,13 @@ export const ContentEngineStudio: React.FC<ContentEngineStudioProps> = ({
                 className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-lg transition-all disabled:opacity-50"
               >
                 <RefreshCw className={`w-4 h-4 ${isGeneratingBulk ? 'animate-spin' : ''}`} />
-                <span>Generate 7-Day Batch Plan</span>
+                <span>Generate 7-Day Plan</span>
               </button>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
               <div>
-                <label className="block text-[10px] font-semibold text-slate-400 mb-1">
-                  CORE BATCH THEME
-                </label>
+                <label className="block text-[10px] font-semibold text-slate-400 mb-1">BATCH THEME</label>
                 <input
                   type="text"
                   value={bulkTheme}
@@ -800,13 +799,11 @@ export const ContentEngineStudio: React.FC<ContentEngineStudioProps> = ({
             <div className="space-y-3">
               <div className="flex items-center justify-between px-1">
                 <h4 className="text-xs font-bold text-cyan-400 uppercase tracking-wider">
-                  Weekly Sequence ({bulkPlan.plans?.length || 7} Days Scheduled)
+                  Weekly Sequence ({bulkPlan.plans?.length || 7} Days)
                 </h4>
                 <button
                   onClick={() => {
-                    bulkPlan.plans?.forEach((p) => {
-                      handleAddTopicToCalendar(p.topic, selectedNiche);
-                    });
+                    bulkPlan.plans?.forEach((p) => handleAddTopicToCalendar(p.topic, selectedNiche));
                   }}
                   className="text-xs text-purple-400 hover:text-purple-300 font-semibold"
                 >
@@ -823,9 +820,7 @@ export const ContentEngineStudio: React.FC<ContentEngineStudioProps> = ({
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-[10px] text-slate-400">
                         <span className="font-bold text-cyan-300 font-mono">{plan.day}</span>
-                        <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300">
-                          {plan.format}
-                        </span>
+                        <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300">{plan.format}</span>
                       </div>
                       <h5 className="text-xs font-bold text-white leading-snug">{plan.topic}</h5>
                       <p className="text-[11px] text-slate-300 italic">"{plan.hookIdea}"</p>
@@ -853,27 +848,44 @@ export const ContentEngineStudio: React.FC<ContentEngineStudioProps> = ({
         </div>
       )}
 
-      {/* TAB 5: Content Calendar & Production Pipeline */}
+      {/* TAB 5: Content Calendar */}
       {activeTab === 'calendar' && (
         <div className="space-y-4">
-          <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3">
             <div>
-              <h3 className="text-sm font-bold text-white">Content Production Schedule</h3>
+              <h3 className="text-sm font-bold text-white">Content Production Calendar</h3>
               <p className="text-xs text-slate-400">
-                Track status across Idea, Scripted, Recorded, Rendered and Published stages
+                Schedule topics and track progress across Idea, Scripted, Recorded, Rendered &amp; Published.
               </p>
             </div>
 
-            <button
-              onClick={() => {
-                const title = prompt('Enter video topic to schedule:');
-                if (title) handleAddTopicToCalendar(title, selectedNiche);
-              }}
-              className="px-3.5 py-1.5 rounded-xl bg-cyan-500 text-slate-950 font-bold text-xs flex items-center gap-1.5"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Add Custom Topic</span>
-            </button>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                type="text"
+                value={customCalendarTitle}
+                onChange={(e) => setCustomCalendarTitle(e.target.value)}
+                placeholder="Enter custom video topic to schedule..."
+                className="flex-1 px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white outline-none focus:border-cyan-400"
+              />
+              <input
+                type="date"
+                value={customCalendarDate}
+                onChange={(e) => setCustomCalendarDate(e.target.value)}
+                className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white outline-none"
+              />
+              <button
+                onClick={() => {
+                  if (!customCalendarTitle.trim()) return;
+                  handleAddTopicToCalendar(customCalendarTitle.trim(), selectedNiche, customCalendarDate);
+                  setCustomCalendarTitle('');
+                }}
+                disabled={!customCalendarTitle.trim()}
+                className="px-4 py-2 rounded-xl bg-cyan-500 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 disabled:opacity-40"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Schedule Topic</span>
+              </button>
+            </div>
           </div>
 
           <div className="space-y-2.5">
@@ -884,9 +896,7 @@ export const ContentEngineStudio: React.FC<ContentEngineStudioProps> = ({
               >
                 <div className="flex items-center gap-3">
                   <div className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-center">
-                    <span className="text-[10px] font-mono text-cyan-400 block font-bold">
-                      {item.date}
-                    </span>
+                    <span className="text-[10px] font-mono text-cyan-400 block font-bold">{item.date}</span>
                     <span className="text-[9px] text-slate-400 uppercase">
                       {item.platform === 'youtube_long' ? '16:9 Long' : '9:16 Reel'}
                     </span>
@@ -897,9 +907,7 @@ export const ContentEngineStudio: React.FC<ContentEngineStudioProps> = ({
                     <p className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
                       <span className="capitalize">{item.niche.replace('_', ' ')}</span>
                       <span>•</span>
-                      <span className="uppercase text-cyan-400 font-mono text-[10px]">
-                        {item.primaryLanguage}
-                      </span>
+                      <span className="uppercase text-cyan-400 font-mono text-[10px]">{item.primaryLanguage}</span>
                     </p>
                   </div>
                 </div>
@@ -912,21 +920,13 @@ export const ContentEngineStudio: React.FC<ContentEngineStudioProps> = ({
                       updated[idx].status = e.target.value as any;
                       setCalendarItems(updated);
                     }}
-                    className={`px-3 py-1 rounded-lg text-xs font-bold outline-none border ${
-                      item.status === 'published'
-                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                        : item.status === 'rendered'
-                        ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
-                        : item.status === 'scripted'
-                        ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
-                        : 'bg-slate-800 text-slate-300 border-slate-700'
-                    }`}
+                    className="px-3 py-1 rounded-lg text-xs font-bold outline-none border bg-slate-800 text-slate-200 border-slate-700"
                   >
-                    <option value="idea">💡 Idea</option>
-                    <option value="scripted">✍️ Scripted</option>
-                    <option value="recorded">🎙️ Recorded</option>
-                    <option value="rendered">🎬 Rendered</option>
-                    <option value="published">🚀 Published</option>
+                    <option value="idea">Idea</option>
+                    <option value="scripted">Scripted</option>
+                    <option value="recorded">Recorded</option>
+                    <option value="rendered">Rendered</option>
+                    <option value="published">Published</option>
                   </select>
 
                   <button
@@ -937,9 +937,7 @@ export const ContentEngineStudio: React.FC<ContentEngineStudioProps> = ({
                   </button>
 
                   <button
-                    onClick={() => {
-                      setCalendarItems((prev) => prev.filter((_, i) => i !== idx));
-                    }}
+                    onClick={() => setCalendarItems((prev) => prev.filter((_, i) => i !== idx))}
                     className="p-1 rounded-lg text-slate-500 hover:text-rose-400"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -948,6 +946,180 @@ export const ContentEngineStudio: React.FC<ContentEngineStudioProps> = ({
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* TAB 6 & 7 & 8: Persistent Library Search Bar */}
+      {(activeTab === 'saved_scripts' || activeTab === 'saved_hooks' || activeTab === 'history') && (
+        <div className="space-y-4">
+          <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="relative flex-1 w-full">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <input
+                type="text"
+                placeholder="Search library by title, topic, or text..."
+                value={librarySearch}
+                onChange={(e) => setLibrarySearch(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 outline-none focus:border-cyan-500"
+              />
+            </div>
+
+            {activeTab !== 'history' ? (
+              <select
+                value={libraryLangFilter}
+                onChange={(e) => setLibraryLangFilter(e.target.value)}
+                className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 outline-none"
+              >
+                <option value="">All Languages</option>
+                <option value="urdu">Urdu</option>
+                <option value="english">English</option>
+                <option value="roman_urdu">Roman Urdu</option>
+                <option value="arabic">Arabic</option>
+                <option value="hindi">Hindi</option>
+              </select>
+            ) : (
+              <button
+                onClick={async () => {
+                  await clearContentHistory();
+                  setContentHistory([]);
+                  showNotice('Content history cleared.');
+                }}
+                className="px-3.5 py-2 rounded-xl bg-rose-500/15 text-rose-300 border border-rose-500/30 text-xs font-semibold"
+              >
+                Clear History
+              </button>
+            )}
+          </div>
+
+          {loadingLibrary ? (
+            <div className="p-12 text-center text-xs text-slate-400">Loading library...</div>
+          ) : activeTab === 'saved_scripts' ? (
+            savedScripts.length === 0 ? (
+              <div className="p-12 rounded-3xl bg-slate-900/40 border border-slate-800 text-center text-xs text-slate-400">
+                No saved scripts yet. Generate a script in the AI Script Writer and click "Save to Library".
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {savedScripts.map((sc) => {
+                  const previewHook = sc.alternativeHooks?.[0] || sc.fullScript?.slice(0, 140) || '';
+                  return (
+                    <div key={sc.id} className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 text-[10px] font-bold uppercase">
+                          {sc.primaryLanguage} • {String(sc.niche).replace(/_/g, ' ')}
+                        </span>
+                        <button
+                          onClick={async () => {
+                            await deleteSavedScript(sc.id);
+                            setSavedScripts((prev) => prev.filter((item) => item.id !== sc.id));
+                          }}
+                          className="p-1 text-slate-500 hover:text-rose-400"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <h4 className="text-sm font-bold text-white">{sc.title}</h4>
+                      <p className="text-xs text-slate-400 line-clamp-2">{previewHook}</p>
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-800">
+                        <span className="text-[10px] text-slate-500">
+                          {new Date(sc.createdAt).toLocaleDateString()} • {sc.wordCount} words
+                        </span>
+                        <button
+                          onClick={() => onSendToScriptWriter(sc.topic || sc.title, sc.primaryLanguage, previewHook)}
+                          className="px-3 py-1 rounded-lg bg-cyan-500 text-slate-950 font-bold text-xs"
+                        >
+                          Open in Script Writer
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )
+          ) : activeTab === 'saved_hooks' ? (
+            savedHooks.length === 0 ? (
+              <div className="p-12 rounded-3xl bg-slate-900/40 border border-slate-800 text-center text-xs text-slate-400">
+                No saved hooks yet. Click "Save Hook" inside the Hook Designer or Script Writer.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {savedHooks.map((hk) => (
+                  <div key={hk.id} className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-bold uppercase">
+                        {hk.hookType} • {hk.primaryLanguage}
+                      </span>
+                      <button
+                        onClick={async () => {
+                          await deleteSavedHook(hk.id);
+                          setSavedHooks((prev) => prev.filter((item) => item.id !== hk.id));
+                        }}
+                        className="p-1 text-slate-500 hover:text-rose-400"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <p className="text-sm font-bold text-white leading-relaxed">"{hk.openingLine}"</p>
+                    <p className="text-[11px] text-slate-400">Topic: {hk.topic}</p>
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-800">
+                      <button
+                        onClick={() => handleCopyText(hk.openingLine, hk.id)}
+                        className="text-xs text-slate-300 hover:text-white flex items-center gap-1"
+                      >
+                        <Copy className="w-3 h-3" />
+                        <span>{copiedId === hk.id ? 'Copied' : 'Copy'}</span>
+                      </button>
+                      <button
+                        onClick={() => onSendToScriptWriter(hk.topic, hk.primaryLanguage, hk.openingLine)}
+                        className="px-3 py-1 rounded-lg bg-purple-500 text-white font-bold text-xs"
+                      >
+                        Use in Script
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          ) : contentHistory.length === 0 ? (
+            <div className="p-12 rounded-3xl bg-slate-900/40 border border-slate-800 text-center text-xs text-slate-400">
+              No generation history recorded yet. Generated scripts, hooks, documentaries, and topics are logged here automatically.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {contentHistory.map((item) => (
+                <div
+                  key={item.id}
+                  className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                >
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded bg-cyan-500/15 text-cyan-300 text-[10px] font-bold uppercase">
+                        {item.actionType}
+                      </span>
+                      <span className="text-xs font-bold text-white">{item.title}</span>
+                    </div>
+                    {(item.niche || item.language) && (
+                      <p className="text-[11px] text-slate-400 mt-1">
+                        {item.niche ? String(item.niche).replace(/_/g, ' ') : 'Studio'}{' '}
+                        {item.language ? `• ${item.language.toUpperCase()}` : ''}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-[10px] text-slate-500">
+                      {new Date(item.createdAt).toLocaleString()}
+                    </span>
+                    <button
+                      onClick={() => onSendToScriptWriter(item.title, item.language || 'urdu')}
+                      className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 text-xs font-semibold"
+                    >
+                      Reuse Topic
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

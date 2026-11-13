@@ -245,16 +245,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Brand Header */}
         <div className="p-5 border-b border-slate-800/60 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="relative">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 via-indigo-600 to-purple-600 p-[1.5px] shadow-lg shadow-cyan-500/20">
-                <div className="w-full h-full bg-[#090d16] rounded-[10px] flex items-center justify-center">
-                  <Zap className="w-5 h-5 text-cyan-400 fill-cyan-400/20" />
-                </div>
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 via-indigo-600 to-purple-600 p-[1.5px] shadow-lg shadow-cyan-500/20">
+              <div className="w-full h-full bg-[#090d16] rounded-[10px] flex items-center justify-center">
+                <Zap className="w-5 h-5 text-cyan-400 fill-cyan-400/20" />
               </div>
-              <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-cyan-500"></span>
-              </span>
             </div>
             <div>
               <div className="flex items-center gap-1.5">
@@ -262,7 +256,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   NEXORA
                 </span>
                 <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 tracking-widest">
-                  AI v2
+                  PRO
                 </span>
               </div>
               <p className="text-[11px] text-slate-400 font-medium">Video Production Studio</p>
@@ -322,21 +316,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
           ))}
         </nav>
 
-        {/* Free First Plan Status Box */}
+        {/* Studio Status Box */}
         <div className="p-4 m-4 rounded-2xl bg-gradient-to-b from-slate-900/90 to-[#0d1322] border border-cyan-500/20 shadow-xl shadow-cyan-950/20">
           <div className="flex items-center justify-between mb-2">
             <span className="flex items-center gap-1.5 text-xs font-semibold text-cyan-400">
-              <Sparkles className="w-3.5 h-3.5" /> Free AI Engine
+              <Sparkles className="w-3.5 h-3.5" /> Multi-Provider Engine
             </span>
             <span className="text-[10px] px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full font-bold">
               Active
             </span>
           </div>
           <p className="text-[11px] text-slate-400 leading-relaxed mb-3">
-            Unlimited Urdu scripts, Pexels HD stock clips, client-side video rendering & voice synthesis.
+            Multi-language scripts, attributed HD stock clips, 1080p canvas rendering &amp; verified audio export.
           </p>
           <div className="w-full bg-slate-800/80 rounded-full h-1.5 overflow-hidden">
-            <div className="bg-gradient-to-r from-cyan-400 to-purple-500 h-full w-full rounded-full animate-pulse" />
+            <div className="bg-gradient-to-r from-cyan-400 to-purple-500 h-full w-full rounded-full" />
           </div>
         </div>
 
@@ -345,7 +339,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="flex items-center justify-center gap-2">
             <span className="font-urdu text-sm font-semibold text-slate-300">نیکسورا اے آئی</span>
             <span className="text-slate-500">•</span>
-            <span>v1.0 Pro</span>
+            <span>v3.0 Pro</span>
           </div>
         </div>
       </aside>

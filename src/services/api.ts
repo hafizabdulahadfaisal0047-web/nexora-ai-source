@@ -7,11 +7,20 @@ import {
   ScriptImprovementResult,
   RetentionAnalysisResult,
   VideoLanguage,
+  ProviderConfig,
+  SavedScriptItem,
+  SavedHookItem,
+  ContentHistoryItem,
+  ExportHistoryItem,
+  SystemErrorLog,
+  BackgroundJob,
 } from '../types';
 
 export interface SystemStatus {
   hasGemini: boolean;
   hasPexels: boolean;
+  hasPixabay?: boolean;
+  hasOpenAICompatible?: boolean;
   status: string;
   version: string;
   model: string;
@@ -26,9 +35,11 @@ export async function fetchSystemStatus(): Promise<SystemStatus> {
     return {
       hasGemini: false,
       hasPexels: false,
+      hasPixabay: false,
+      hasOpenAICompatible: false,
       status: 'offline',
-      version: '2.0.0',
-      model: 'gemini-3.8-flash',
+      version: '3.0.0',
+      model: 'gemini-4-hydrogen',
     };
   }
 }
@@ -96,19 +107,53 @@ export async function generateSeoTools(
   return await res.json();
 }
 
+export async function searchUnifiedMedia(params: {
+  query: string;
+  orientation?: 'landscape' | 'portrait' | 'square';
+  perPage?: number;
+  page?: number;
+  excludeUrls?: string[];
+  excludeIds?: string[];
+  minDuration?: number;
+  maxDuration?: number;
+  provider?: 'all' | 'pexels' | 'pixabay' | 'curated';
+}): Promise<{
+  success: boolean;
+  videos: StockVideo[];
+  extractedConcepts?: string[];
+  source: string;
+  cached?: boolean;
+  page?: number;
+  hasMore?: boolean;
+}> {
+  const res = await fetch('/api/media/search', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) {
+    throw new Error(`Intelligent media search failed: ${res.statusText}`);
+  }
+  return await res.json();
+}
+
 export async function searchStockVideos(
   query: string,
   orientation: 'landscape' | 'portrait' = 'landscape',
   perPage: number = 10,
-  customPexelsKey?: string
-): Promise<{ videos: StockVideo[]; source: string; note?: string }> {
-  const headers: Record<string, string> = {};
-  if (customPexelsKey) {
-    headers['x-pexels-key'] = customPexelsKey;
+  page: number = 1,
+  excludeUrls: string[] = []
+): Promise<{ videos: StockVideo[]; source: string; note?: string; cached?: boolean; hasMore?: boolean }> {
+  const params = new URLSearchParams({
+    query,
+    orientation,
+    per_page: String(perPage),
+    page: String(page),
+  });
+  if (excludeUrls.length > 0) {
+    params.set('exclude', excludeUrls.join(','));
   }
-
-  const url = `/api/pexels/videos?query=${encodeURIComponent(query)}&orientation=${orientation}&per_page=${perPage}`;
-  const res = await fetch(url, { headers });
+  const res = await fetch(`/api/pexels/videos?${params.toString()}`);
   if (!res.ok) {
     throw new Error(`Stock video search failed: ${res.statusText}`);
   }
@@ -129,7 +174,7 @@ export async function generateSpeechAudio(
   language: string = 'urdu',
   speed: number = 1.0,
   style?: string
-): Promise<{ success: boolean; dataUri?: string; audioBase64?: string; error?: string }> {
+): Promise<{ success: boolean; dataUri?: string; audioBase64?: string; mimeType?: string; error?: string }> {
   try {
     const res = await fetch('/api/gemini/tts', {
       method: 'POST',
@@ -143,7 +188,6 @@ export async function generateSpeechAudio(
   }
 }
 
-// 6. Advanced Hook Designer Client
 export async function generateHooks(params: {
   topic: string;
   targetAudience?: string;
@@ -161,7 +205,6 @@ export async function generateHooks(params: {
   return await res.json();
 }
 
-// 7. Script Improver Client
 export async function improveScript(params: {
   originalText: string;
   primaryLanguage?: VideoLanguage;
@@ -177,7 +220,6 @@ export async function improveScript(params: {
   return await res.json();
 }
 
-// 8. Video Link Analyzer Client
 export async function analyzeVideoLink(url: string): Promise<{ success: boolean; data: LinkAnalysisResult; isFallback?: boolean }> {
   const res = await fetch('/api/gemini/link-analyze', {
     method: 'POST',
@@ -188,7 +230,6 @@ export async function analyzeVideoLink(url: string): Promise<{ success: boolean;
   return await res.json();
 }
 
-// 9. Retention & Viral Optimizer Client
 export async function analyzeRetention(params: {
   contentText: string;
   platform?: string;
@@ -203,7 +244,6 @@ export async function analyzeRetention(params: {
   return await res.json();
 }
 
-// 10. Complete Topic-to-Video Workflow Client
 export async function generateTopicToVideo(params: {
   topic: string;
   language?: VideoLanguage;
@@ -220,30 +260,26 @@ export async function generateTopicToVideo(params: {
   return await res.json();
 }
 
-// 11. Pixabay Stock Video Search Client
 export async function searchPixabayVideos(
   query: string,
   perPage: number = 10,
-  customPixabayKey?: string
-): Promise<{ videos: StockVideo[]; source: string; note?: string }> {
-  const headers: Record<string, string> = {};
-  if (customPixabayKey) {
-    headers['x-pixabay-key'] = customPixabayKey;
-  }
-  const url = `/api/pixabay/videos?query=${encodeURIComponent(query)}&per_page=${perPage}`;
-  const res = await fetch(url, { headers });
+  page: number = 1
+): Promise<{ videos: StockVideo[]; source: string; note?: string; cached?: boolean; hasMore?: boolean }> {
+  const url = `/api/pixabay/videos?query=${encodeURIComponent(query)}&per_page=${perPage}&page=${page}`;
+  const res = await fetch(url);
   if (!res.ok) throw new Error(`Pixabay search failed: ${res.statusText}`);
   return await res.json();
 }
 
-// 12. Provider Settings API
-export async function fetchProviderSettings(): Promise<{ success: boolean; providers: any }> {
+export async function fetchProviderSettings(): Promise<{ success: boolean; providers: ProviderConfig }> {
   const res = await fetch('/api/settings/providers');
   if (!res.ok) throw new Error('Failed to load provider settings');
   return await res.json();
 }
 
-export async function updateProviderSettings(config: any): Promise<{ success: boolean; providers: any; message: string }> {
+export async function updateProviderSettings(
+  config: Partial<ProviderConfig>
+): Promise<{ success: boolean; providers: ProviderConfig; message: string }> {
   const res = await fetch('/api/settings/providers', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -253,14 +289,18 @@ export async function updateProviderSettings(config: any): Promise<{ success: bo
   return await res.json();
 }
 
-// 13. System API Usage & Quotas
-export async function fetchSystemUsage(): Promise<{ success: boolean; stats: any; activeProviders: any; quotaHealth: any }> {
+export async function fetchSystemUsage(): Promise<{
+  success: boolean;
+  stats: any;
+  activeProviders: any;
+  quotaHealth: any;
+  cacheEntries?: number;
+}> {
   const res = await fetch('/api/system/usage');
   if (!res.ok) throw new Error('Failed to fetch system usage stats');
   return await res.json();
 }
 
-// 14. Content Generation Engine Client
 export async function fetchContentTopics(
   niche: string = 'business_documentaries',
   count: number = 8,
@@ -313,8 +353,91 @@ export async function generateBulkPlan(
   return await res.json();
 }
 
-// 15. Background Job Queue Client
-export async function createBackgroundJob(taskType: string, payload?: any): Promise<{ success: boolean; job: any }> {
+// Persistent Library APIs (Saved Scripts, Saved Hooks, Content History)
+export async function fetchSavedScripts(search?: string, language?: string): Promise<{ success: boolean; scripts: SavedScriptItem[] }> {
+  const params = new URLSearchParams();
+  if (search) params.set('search', search);
+  if (language) params.set('language', language);
+  const res = await fetch(`/api/library/scripts?${params.toString()}`);
+  if (!res.ok) throw new Error('Failed to fetch saved scripts');
+  return await res.json();
+}
+
+export async function saveScriptToLibrary(payload: Partial<SavedScriptItem>): Promise<{ success: boolean; script: SavedScriptItem }> {
+  const res = await fetch('/api/library/scripts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error('Failed to save script');
+  return await res.json();
+}
+
+export async function deleteSavedScript(id: string): Promise<{ success: boolean }> {
+  const res = await fetch(`/api/library/scripts/${id}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error('Failed to delete script');
+  return await res.json();
+}
+
+export async function fetchSavedHooks(search?: string, language?: string): Promise<{ success: boolean; hooks: SavedHookItem[] }> {
+  const params = new URLSearchParams();
+  if (search) params.set('search', search);
+  if (language) params.set('language', language);
+  const res = await fetch(`/api/library/hooks?${params.toString()}`);
+  if (!res.ok) throw new Error('Failed to fetch saved hooks');
+  return await res.json();
+}
+
+export async function saveHookToLibrary(payload: Partial<SavedHookItem>): Promise<{ success: boolean; hook: SavedHookItem }> {
+  const res = await fetch('/api/library/hooks', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error('Failed to save hook');
+  return await res.json();
+}
+
+export async function deleteSavedHook(id: string): Promise<{ success: boolean }> {
+  const res = await fetch(`/api/library/hooks/${id}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error('Failed to delete hook');
+  return await res.json();
+}
+
+export async function fetchContentHistory(search?: string, type?: string): Promise<{ success: boolean; history: ContentHistoryItem[] }> {
+  const params = new URLSearchParams();
+  if (search) params.set('search', search);
+  if (type) params.set('type', type);
+  const res = await fetch(`/api/library/history?${params.toString()}`);
+  if (!res.ok) throw new Error('Failed to fetch content history');
+  return await res.json();
+}
+
+export async function clearContentHistory(): Promise<{ success: boolean }> {
+  const res = await fetch('/api/library/history', { method: 'DELETE' });
+  if (!res.ok) throw new Error('Failed to clear history');
+  return await res.json();
+}
+
+// Export History & Platform Package APIs
+export async function fetchExportHistory(): Promise<{ success: boolean; exports: ExportHistoryItem[] }> {
+  const res = await fetch('/api/exports/history');
+  if (!res.ok) throw new Error('Failed to fetch export history');
+  return await res.json();
+}
+
+export async function recordExportHistory(payload: Partial<ExportHistoryItem>): Promise<{ success: boolean; item: ExportHistoryItem }> {
+  const res = await fetch('/api/exports/history', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error('Failed to record export history');
+  return await res.json();
+}
+
+// Background Job Queue APIs
+export async function createBackgroundJob(taskType: string, payload?: any): Promise<{ success: boolean; job: BackgroundJob }> {
   const res = await fetch('/api/jobs/create', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -324,14 +447,52 @@ export async function createBackgroundJob(taskType: string, payload?: any): Prom
   return await res.json();
 }
 
-export async function fetchBackgroundJob(id: string): Promise<{ success: boolean; job: any }> {
+export async function fetchBackgroundJob(id: string): Promise<{ success: boolean; job: BackgroundJob }> {
   const res = await fetch(`/api/jobs/${id}`);
   if (!res.ok) throw new Error('Failed to fetch job status');
   return await res.json();
 }
 
-export async function listBackgroundJobs(): Promise<{ success: boolean; jobs: any[] }> {
+export async function listBackgroundJobs(): Promise<{ success: boolean; jobs: BackgroundJob[] }> {
   const res = await fetch('/api/jobs');
   if (!res.ok) throw new Error('Failed to list background jobs');
+  return await res.json();
+}
+
+// System Logs, Cache & Storage Management APIs
+export async function fetchSystemLogs(): Promise<{ success: boolean; logs: SystemErrorLog[] }> {
+  const res = await fetch('/api/system/logs');
+  if (!res.ok) throw new Error('Failed to load system logs');
+  return await res.json();
+}
+
+export async function clearSystemLogs(): Promise<{ success: boolean }> {
+  const res = await fetch('/api/system/logs', { method: 'DELETE' });
+  if (!res.ok) throw new Error('Failed to clear system logs');
+  return await res.json();
+}
+
+export async function clearMediaCache(): Promise<{ success: boolean; clearedCount: number }> {
+  const res = await fetch('/api/system/cache/clear', { method: 'POST' });
+  if (!res.ok) throw new Error('Failed to clear media cache');
+  return await res.json();
+}
+
+export async function fetchSystemStorage(): Promise<{
+  success: boolean;
+  storeFileBytes: number;
+  counts: {
+    savedScripts: number;
+    savedHooks: number;
+    contentHistory: number;
+    exportHistory: number;
+    topicHistory: number;
+    mediaCacheEntries: number;
+    errorLogs: number;
+    activeJobs: number;
+  };
+}> {
+  const res = await fetch('/api/system/storage');
+  if (!res.ok) throw new Error('Failed to load storage summary');
   return await res.json();
 }

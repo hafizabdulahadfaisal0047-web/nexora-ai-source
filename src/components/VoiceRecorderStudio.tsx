@@ -28,6 +28,7 @@ export const VoiceRecorderStudio: React.FC<VoiceRecorderStudioProps> = ({
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackTime, setPlaybackTime] = useState(0);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const recorderRef = useRef<VoiceRecorder | null>(null);
   const timerRef = useRef<any>(null);
@@ -49,12 +50,13 @@ export const VoiceRecorderStudio: React.FC<VoiceRecorderStudioProps> = ({
     if (isRecording) {
       clearInterval(timerRef.current);
       setIsRecording(false);
+      setErrorMsg(null);
       try {
         const res = await recorderRef.current.stopRecording();
         setRecordedAudioUrl(res.url);
         setRecordedBlob(res.blob);
       } catch (e: any) {
-        alert(`Recording note: ${e.message}`);
+        setErrorMsg(e.message || 'Recording failed to stop cleanly.');
       }
     } else {
       if (recordedAudioUrl) {
@@ -63,6 +65,7 @@ export const VoiceRecorderStudio: React.FC<VoiceRecorderStudioProps> = ({
       setRecordedAudioUrl(null);
       setRecordedBlob(null);
       setRecordingSeconds(0);
+      setErrorMsg(null);
       try {
         await recorderRef.current.startRecording();
         setIsRecording(true);
@@ -70,7 +73,7 @@ export const VoiceRecorderStudio: React.FC<VoiceRecorderStudioProps> = ({
           setRecordingSeconds((prev) => prev + 1);
         }, 1000);
       } catch (err: any) {
-        alert(`Microphone permission note: ${err.message || 'Please allow microphone access.'}`);
+        setErrorMsg(err.message || 'Microphone access denied or unavailable. Please allow microphone access.');
         setIsRecording(false);
       }
     }
@@ -120,6 +123,16 @@ export const VoiceRecorderStudio: React.FC<VoiceRecorderStudioProps> = ({
           </p>
         </div>
       </div>
+
+      {errorMsg && (
+        <div className="p-4 rounded-2xl bg-rose-950/30 border border-rose-500/40 text-xs text-rose-200 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+          <button onClick={() => setErrorMsg(null)} className="text-rose-300 hover:text-white font-bold">Dismiss</button>
+        </div>
+      )}
 
       {/* Main Recording Console */}
       <div className="p-8 sm:p-12 rounded-3xl bg-slate-900/90 border border-slate-800 shadow-2xl flex flex-col items-center justify-center space-y-8 text-center">

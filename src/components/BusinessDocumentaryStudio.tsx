@@ -19,15 +19,22 @@ import {
   Music,
   Share2,
   Upload,
+  AlertCircle,
+  Bookmark,
 } from 'lucide-react';
 import { DocumentaryPlan, Project, Scene, StockVideo } from '../types';
-import { generateDocumentary, searchStockVideos } from '../services/api';
+import {
+  generateDocumentary,
+  searchUnifiedMedia,
+  saveScriptToLibrary,
+} from '../services/api';
 import { UrduVoiceService } from '../services/audioSynthesizer';
+import { autoSyncAllScenesToSpeech } from '../services/audioEngine';
 
 interface BusinessDocumentaryStudioProps {
   onLoadIntoEditor: (project: Project) => void;
   onSaveProject: (project: Project) => void;
-  customPexelsKey?: string;
+  initialTopic?: string;
 }
 
 const TOPIC_SUGGESTIONS = [
@@ -41,15 +48,17 @@ const TOPIC_SUGGESTIONS = [
 export const BusinessDocumentaryStudio: React.FC<BusinessDocumentaryStudioProps> = ({
   onLoadIntoEditor,
   onSaveProject,
-  customPexelsKey,
+  initialTopic,
 }) => {
-  const [topic, setTopic] = useState('');
+  const [topic, setTopic] = useState(initialTopic || '');
   const [durationMinutes, setDurationMinutes] = useState(3);
   const [tone, setTone] = useState('gripping, investigative and cinematic');
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState('');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [plan, setPlan] = useState<DocumentaryPlan | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [savedScript, setSavedScript] = useState(false);
 
   // Audio preview state
   const [isPlayingVoice, setIsPlayingVoice] = useState<number | null>(null);
@@ -60,46 +69,65 @@ export const BusinessDocumentaryStudio: React.FC<BusinessDocumentaryStudioProps>
   const [stockQuery, setStockQuery] = useState('');
   const [stockResults, setStockResults] = useState<StockVideo[]>([]);
   const [stockLoading, setStockLoading] = useState(false);
+  const [stockPage, setStockPage] = useState(1);
+  const [stockHasMore, setStockHasMore] = useState(false);
 
   const handleGenerate = async (targetTopic?: string) => {
     const selectedTopic = targetTopic || topic;
     if (!selectedTopic.trim()) return;
 
     setLoading(true);
-    setLoadingStep('Analyzing topic & researching business insights...');
+    setErrorMsg(null);
+    setSavedScript(false);
+    setLoadingStep('Researching business case study & writing structured documentary script...');
 
     try {
-      setTimeout(() => setLoadingStep('Writing high-impact Urdu documentary narration...'), 1200);
-      setTimeout(() => setLoadingStep('Structuring scene-by-scene visual timeline...'), 2400);
-      setTimeout(() => setLoadingStep('Connecting with Pexels API for HD stock clips...'), 3600);
-
       const res = await generateDocumentary(selectedTopic, durationMinutes, tone);
       const generatedPlan = res.data;
 
-      // Enhance scenes with Pexels stock footage search
-      const enhancedScenes = await Promise.all(
-        generatedPlan.scenes.map(async (scene, idx) => {
-          try {
-            const query = scene.stockSearchQuery || 'business technology';
-            const stockRes = await searchStockVideos(query, 'landscape', 3, customPexelsKey);
-            const firstVideo = stockRes.videos[0];
-            return {
-              ...scene,
-              videoUrl: firstVideo?.videoUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-              previewUrl:
-                firstVideo?.preview ||
-                'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=800&auto=format&fit=crop&q=80',
-            };
-          } catch {
-            return scene;
-          }
-        })
-      );
+      // Sequentially match each scene with unique stock footage (no repeated clips)
+      const usedUrls: string[] = [];
+      const enhancedScenes = [];
+
+      for (let idx = 0; idx < generatedPlan.scenes.length; idx++) {
+        const scene = generatedPlan.scenes[idx];
+        const query = scene.stockSearchQuery || scene.visualDescription || 'business technology';
+        setLoadingStep(`Matching unique B-roll for scene ${idx + 1}/${generatedPlan.scenes.length}: ${query}`);
+
+        let chosen: StockVideo | null = null;
+        try {
+          const stockRes = await searchUnifiedMedia({
+            query,
+            orientation: 'landscape',
+            perPage: 5,
+            excludeUrls: usedUrls,
+          });
+          chosen = stockRes.videos.find((v) => !usedUrls.includes(v.videoUrl)) || stockRes.videos[0] || null;
+        } catch {
+          chosen = null;
+        }
+
+        if (chosen?.videoUrl) usedUrls.push(chosen.videoUrl);
+
+        enhancedScenes.push({
+          ...scene,
+          videoUrl:
+            chosen?.videoUrl ||
+            'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+          previewUrl:
+            chosen?.preview ||
+            'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=800&auto=format&fit=crop&q=80',
+          sourceProvider: chosen?.source || 'curated',
+          photographer: chosen?.photographer || 'Curated Archive',
+          license: chosen?.license || 'CC0 / Royalty-Free',
+          attributionText: chosen?.attributionText,
+        });
+      }
 
       generatedPlan.scenes = enhancedScenes as any;
       setPlan(generatedPlan);
     } catch (err: any) {
-      alert(`Generation notice: ${err.message || 'Error creating documentary plan'}`);
+      setErrorMsg(err.message || 'Error creating documentary plan.');
     } finally {
       setLoading(false);
       setLoadingStep('');
@@ -122,13 +150,29 @@ export const BusinessDocumentaryStudio: React.FC<BusinessDocumentaryStudioProps>
     });
   };
 
+  const getExcludedUrlsForScene = (idx: number): string[] => {
+    if (!plan) return [];
+    return plan.scenes
+      .filter((_, i) => i !== idx)
+      .map((s) => s.videoUrl || '')
+      .filter(Boolean);
+  };
+
   const openStockModal = async (sceneIndex: number, initialQuery: string) => {
     setSearchingSceneIndex(sceneIndex);
     setStockQuery(initialQuery);
+    setStockPage(1);
     setStockLoading(true);
     try {
-      const res = await searchStockVideos(initialQuery, 'landscape', 9, customPexelsKey);
+      const res = await searchUnifiedMedia({
+        query: initialQuery,
+        orientation: 'landscape',
+        perPage: 9,
+        page: 1,
+        excludeUrls: getExcludedUrlsForScene(sceneIndex),
+      });
       setStockResults(res.videos);
+      setStockHasMore(!!res.hasMore);
     } catch (e) {
       console.error(e);
     } finally {
@@ -136,12 +180,24 @@ export const BusinessDocumentaryStudio: React.FC<BusinessDocumentaryStudioProps>
     }
   };
 
-  const handleSearchStock = async () => {
+  const handleSearchStock = async (pageToLoad: number = 1) => {
     if (!stockQuery.trim()) return;
     setStockLoading(true);
     try {
-      const res = await searchStockVideos(stockQuery, 'landscape', 9, customPexelsKey);
-      setStockResults(res.videos);
+      const res = await searchUnifiedMedia({
+        query: stockQuery,
+        orientation: 'landscape',
+        perPage: 9,
+        page: pageToLoad,
+        excludeUrls: searchingSceneIndex !== null ? getExcludedUrlsForScene(searchingSceneIndex) : [],
+      });
+      if (pageToLoad === 1) {
+        setStockResults(res.videos);
+      } else {
+        setStockResults((prev) => [...prev, ...res.videos]);
+      }
+      setStockPage(pageToLoad);
+      setStockHasMore(!!res.hasMore);
     } catch (e) {
       console.error(e);
     } finally {
@@ -156,39 +212,75 @@ export const BusinessDocumentaryStudio: React.FC<BusinessDocumentaryStudioProps>
       ...updated.scenes[searchingSceneIndex],
       videoUrl: video.videoUrl,
       previewUrl: video.preview,
+      sourceProvider: video.source,
+      photographer: video.photographer,
+      license: video.license,
+      attributionText: video.attributionText,
     } as any;
     setPlan(updated);
     setSearchingSceneIndex(null);
   };
 
+  const handleSaveDocScript = async () => {
+    if (!plan) return;
+    try {
+      const fullText = plan.scenes.map((s) => s.urduNarration).join('\n\n');
+      await saveScriptToLibrary({
+        title: plan.youtubeSeo?.titles?.[0] || plan.topic,
+        topic: plan.topic,
+        niche: 'business_documentaries',
+        primaryLanguage: plan.primaryLanguage || 'urdu',
+        alternativeHooks: plan.hook ? [plan.hook] : [],
+        fullScript: fullText,
+        scenesCount: plan.scenes.length,
+        targetDurationSeconds: plan.scenes.reduce((acc, s) => acc + (s.durationSeconds || 10), 0),
+        tags: plan.youtubeSeo?.tags || [],
+      });
+      setSavedScript(true);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to save documentary script.');
+    }
+  };
+
   const handleCreateProject = () => {
     if (!plan) return;
+    const rawScenes: Scene[] = plan.scenes.map((s, idx) => ({
+      id: `sc_${Date.now()}_${idx}`,
+      sceneNumber: s.sceneNumber,
+      title: s.title,
+      visualDescription: s.visualDescription,
+      stockSearchQuery: s.stockSearchQuery,
+      videoUrl:
+        (s as any).videoUrl ||
+        'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+      previewUrl:
+        (s as any).previewUrl ||
+        'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=800&auto=format&fit=crop&q=80',
+      urduNarration: s.urduNarration,
+      englishSubtitle: s.englishSubtitle,
+      durationSeconds: s.durationSeconds || 10,
+      transition: s.transition || 'fade',
+      soundEffect: s.soundEffect,
+      sourceProvider: (s as any).sourceProvider || 'curated',
+      photographer: (s as any).photographer,
+      license: (s as any).license,
+      attributionText: (s as any).attributionText,
+    }));
+
+    const syncedScenes = autoSyncAllScenesToSpeech(rawScenes, plan.primaryLanguage || 'urdu', 1.0, 0.4);
+
     const project: Project = {
       id: `doc_${Date.now()}`,
       title: plan.youtubeSeo?.titles?.[0] || plan.topic || 'Untitled Documentary',
       type: 'business_documentary',
+      primaryLanguage: plan.primaryLanguage || 'urdu',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       aspectRatio: '16:9',
       resolution: '1080p',
-      bgMusicTrack: plan.musicRecommendation?.trackStyle || 'Cinematic Tension',
+      bgMusicTrack: plan.musicRecommendation?.trackStyle || 'Cinematic Documentary',
       bgMusicVolume: 0.25,
-      scenes: plan.scenes.map((s, idx) => ({
-        id: `sc_${Date.now()}_${idx}`,
-        sceneNumber: s.sceneNumber,
-        title: s.title,
-        visualDescription: s.visualDescription,
-        stockSearchQuery: s.stockSearchQuery,
-        videoUrl: (s as any).videoUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-        previewUrl:
-          (s as any).previewUrl ||
-          'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=800&auto=format&fit=crop&q=80',
-        urduNarration: s.urduNarration,
-        englishSubtitle: s.englishSubtitle,
-        durationSeconds: s.durationSeconds || 15,
-        transition: s.transition || 'fade',
-        soundEffect: s.soundEffect,
-      })),
+      scenes: syncedScenes,
       youtubeSeo: plan.youtubeSeo,
     };
 
@@ -306,17 +398,24 @@ export const BusinessDocumentaryStudio: React.FC<BusinessDocumentaryStudioProps>
         </div>
       </div>
 
+      {errorMsg && (
+        <div className="p-4 rounded-2xl bg-rose-950/30 border border-rose-500/40 text-xs text-rose-200 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+          <button onClick={() => setErrorMsg(null)} className="text-rose-300 hover:text-white font-bold">Dismiss</button>
+        </div>
+      )}
+
       {/* Loading Progress State */}
       {loading && (
-        <div className="p-8 rounded-3xl bg-slate-900/80 border border-cyan-500/30 text-center space-y-4 animate-pulse">
+        <div className="p-8 rounded-3xl bg-slate-900/80 border border-cyan-500/30 text-center space-y-4">
           <div className="w-12 h-12 rounded-full bg-cyan-500/20 text-cyan-400 mx-auto flex items-center justify-center">
             <RefreshCw className="w-6 h-6 animate-spin" />
           </div>
           <h3 className="text-lg font-bold text-white">NEXORA AI is Architecting Your Documentary...</h3>
           <p className="text-xs text-cyan-400 font-mono tracking-wide">{loadingStep}</p>
-          <div className="max-w-md mx-auto bg-slate-800 rounded-full h-1.5 overflow-hidden">
-            <div className="bg-gradient-to-r from-cyan-400 to-indigo-500 h-full w-3/4 animate-pulse rounded-full" />
-          </div>
         </div>
       )}
 
@@ -332,11 +431,20 @@ export const BusinessDocumentaryStudio: React.FC<BusinessDocumentaryStudioProps>
               <h3 className="text-xl font-extrabold text-white mt-0.5">{plan.topic}</h3>
               <p className="text-xs text-slate-400 mt-1">
                 {plan.scenes.length} Scenes • ~
-                {plan.scenes.reduce((acc, s) => acc + (s.durationSeconds || 15), 0)}s Timeline
+                {plan.scenes.reduce((acc, s) => acc + (s.durationSeconds || 10), 0)}s Timeline
               </p>
             </div>
 
-            <div className="flex items-center gap-3 w-full sm:w-auto">
+            <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+              <button
+                onClick={handleSaveDocScript}
+                disabled={savedScript}
+                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold text-xs flex items-center gap-1.5 transition-all disabled:opacity-60"
+              >
+                {savedScript ? <Check className="w-4 h-4 text-emerald-400" /> : <Bookmark className="w-4 h-4 text-cyan-400" />}
+                <span>{savedScript ? 'Saved to Library' : 'Save Script'}</span>
+              </button>
+
               <button
                 onClick={handleCreateProject}
                 className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-semibold text-xs sm:text-sm shadow-lg shadow-cyan-950/50 flex items-center justify-center gap-2 transition-all"
@@ -462,13 +570,18 @@ export const BusinessDocumentaryStudio: React.FC<BusinessDocumentaryStudioProps>
                             <span>Change Stock</span>
                           </button>
                         </div>
-                        <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-black/70 backdrop-blur-sm text-[10px] font-semibold text-cyan-300">
-                          Pexels Stock Footage
+                        <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-black/75 backdrop-blur-sm text-[10px] font-semibold text-cyan-300 uppercase">
+                          {(scene as any).sourceProvider || 'Stock'} Footage
                         </div>
                       </div>
                       <p className="text-[11px] text-slate-400 mt-2 truncate">
                         Keywords: {scene.stockSearchQuery}
                       </p>
+                      {(scene as any).photographer && (
+                        <p className="text-[10px] text-slate-500 truncate">
+                          Credit: {(scene as any).photographer} ({(scene as any).license || 'Commercial Free'})
+                        </p>
+                      )}
                     </div>
 
                     {/* Script & Narration Box */}
@@ -675,12 +788,12 @@ export const BusinessDocumentaryStudio: React.FC<BusinessDocumentaryStudioProps>
                 type="text"
                 value={stockQuery}
                 onChange={(e) => setStockQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSearchStock()}
-                placeholder="Search stock footage, e.g. corporate boardroom, technology server, factory robot..."
+                onKeyDown={(e) => e.key === 'Enter' && handleSearchStock(1)}
+                placeholder="Search stock footage across Pexels, Pixabay & Curated archive..."
                 className="flex-1 px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white outline-none focus:border-cyan-400"
               />
               <button
-                onClick={handleSearchStock}
+                onClick={() => handleSearchStock(1)}
                 className="px-4 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center gap-1.5"
               >
                 <Search className="w-4 h-4" />
@@ -689,36 +802,57 @@ export const BusinessDocumentaryStudio: React.FC<BusinessDocumentaryStudioProps>
             </div>
 
             <div className="flex-1 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 py-2">
-              {stockLoading ? (
+              {stockLoading && stockResults.length === 0 ? (
                 <div className="col-span-full text-center py-12 text-slate-400">
                   <RefreshCw className="w-6 h-6 animate-spin mx-auto text-cyan-400 mb-2" />
-                  <span>Searching Pexels video catalog...</span>
+                  <span>Searching stock media catalog...</span>
                 </div>
               ) : stockResults.length === 0 ? (
                 <div className="col-span-full text-center py-12 text-slate-400">
                   No video results found. Try another search query.
                 </div>
               ) : (
-                stockResults.map((v) => (
-                  <div
-                    key={v.id}
-                    onClick={() => handleSelectStockClip(v)}
-                    className="cursor-pointer group relative rounded-xl overflow-hidden bg-slate-800 border border-slate-700 hover:border-cyan-400 transition-all"
-                  >
-                    <div className="aspect-video bg-slate-950">
-                      <img src={v.preview} alt={v.title} className="w-full h-full object-cover" />
+                <>
+                  {stockResults.map((v) => (
+                    <div
+                      key={v.id}
+                      onClick={() => handleSelectStockClip(v)}
+                      className="cursor-pointer group relative rounded-xl overflow-hidden bg-slate-800 border border-slate-700 hover:border-cyan-400 transition-all"
+                    >
+                      <div className="aspect-video bg-slate-950 relative">
+                        <img src={v.preview} alt={v.title} className="w-full h-full object-cover" />
+                        <span className="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-black/75 text-[9px] font-bold uppercase text-cyan-300">
+                          {v.source}
+                        </span>
+                        <span className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/75 text-[9px] font-mono text-slate-200">
+                          {v.duration}s
+                        </span>
+                      </div>
+                      <div className="p-2.5 bg-slate-900/90 text-xs">
+                        <p className="font-semibold text-white truncate">{v.title}</p>
+                        <p className="text-[10px] text-slate-400 truncate">
+                          By {v.photographer} • {v.license || 'Commercial Free'}
+                        </p>
+                      </div>
+                      <div className="absolute inset-0 bg-cyan-500/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span className="px-3 py-1 rounded bg-cyan-500 text-slate-950 font-bold text-xs">
+                          Use this Clip
+                        </span>
+                      </div>
                     </div>
-                    <div className="p-2.5 bg-slate-900/90 text-xs">
-                      <p className="font-semibold text-white truncate">{v.title}</p>
-                      <p className="text-[11px] text-slate-400">By {v.photographer}</p>
+                  ))}
+                  {stockHasMore && (
+                    <div className="col-span-full flex justify-center pt-2">
+                      <button
+                        disabled={stockLoading}
+                        onClick={() => handleSearchStock(stockPage + 1)}
+                        className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 text-xs font-bold border border-slate-700 disabled:opacity-50"
+                      >
+                        {stockLoading ? 'Loading...' : 'Load More Stock Clips'}
+                      </button>
                     </div>
-                    <div className="absolute inset-0 bg-cyan-500/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <span className="px-3 py-1 rounded bg-cyan-500 text-slate-950 font-bold text-xs">
-                        Use this Clip
-                      </span>
-                    </div>
-                  </div>
-                ))
+                  )}
+                </>
               )}
             </div>
           </div>

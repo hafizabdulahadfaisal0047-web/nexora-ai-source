@@ -14,15 +14,9 @@ import {
 import { AspectRatio, StockVideo } from '../types';
 import { searchStockVideos } from '../services/api';
 
-interface ThumbnailGeneratorStudioProps {
-  customPexelsKey?: string;
-}
-
 const BADGE_PRESETS = ['DOCUMENTARY', 'EXPOSED', 'حقائق', 'MUST WATCH', 'NEW 2026', 'حیران کن'];
 
-export const ThumbnailGeneratorStudio: React.FC<ThumbnailGeneratorStudioProps> = ({
-  customPexelsKey,
-}) => {
+export const ThumbnailGeneratorStudio: React.FC = () => {
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>('16:9');
   const [urduHeadline, setUrduHeadline] = useState('اربوں ڈالر کا خفیہ کھیل فاش!');
   const [englishHook, setEnglishHook] = useState('THE SHOCKING TRUTH BEHIND THIS CRISIS');
@@ -229,8 +223,7 @@ export const ThumbnailGeneratorStudio: React.FC<ThumbnailGeneratorStudioProps> =
       const res = await searchStockVideos(
         stockSearchQuery,
         aspectRatio === '9:16' ? 'portrait' : 'landscape',
-        9,
-        customPexelsKey
+        9
       );
       setStockResults(res.videos);
     } catch (e) {

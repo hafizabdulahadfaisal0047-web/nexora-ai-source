@@ -1,23 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   FolderKanban,
-  Film,
   Play,
   Copy,
   Trash2,
   Edit3,
   Download,
   Upload,
-  Calendar,
   Clock,
   Layers,
   ArrowRight,
-  Check,
   Plus,
+  History,
+  CheckCircle2,
+  AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
-import { Project } from '../types';
+import { Project, ExportHistoryItem } from '../types';
 import { ProjectStore } from '../services/projectStore';
 import { downloadVideoFile } from '../services/videoRenderer';
+import { fetchExportHistory } from '../services/api';
 
 interface ProjectsManagerProps {
   projects: Project[];
@@ -32,9 +34,31 @@ export const ProjectsManager: React.FC<ProjectsManagerProps> = ({
   onRefreshProjects,
   onNewProject,
 }) => {
+  const [viewMode, setViewMode] = useState<'projects' | 'exports'>('projects');
   const [filterType, setFilterType] = useState<string>('all');
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [renameTitle, setRenameTitle] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [exportHistory, setExportHistory] = useState<ExportHistoryItem[]>([]);
+  const [loadingExports, setLoadingExports] = useState(false);
+
+  const loadExports = async () => {
+    setLoadingExports(true);
+    try {
+      const res = await fetchExportHistory();
+      if (res.success) {
+        setExportHistory(res.exports || []);
+      }
+    } catch (_) {
+    } finally {
+      setLoadingExports(false);
+    }
+  };
+
+  useEffect(() => {
+    loadExports();
+  }, []);
 
   const filteredProjects =
     filterType === 'all'
@@ -56,16 +80,19 @@ export const ProjectsManager: React.FC<ProjectsManagerProps> = ({
     onRefreshProjects();
   };
 
-  const handleDelete = (id: string, title: string) => {
-    if (confirm(`Are you sure you want to delete project: "${title}"?`)) {
-      ProjectStore.deleteProject(id);
-      onRefreshProjects();
-    }
+  const handleConfirmDelete = (id: string) => {
+    ProjectStore.deleteProject(id);
+    setConfirmDeleteId(null);
+    setNotice({ type: 'success', text: 'Project deleted successfully.' });
+    setTimeout(() => setNotice(null), 3000);
+    onRefreshProjects();
   };
 
   const handleDuplicate = (id: string) => {
     ProjectStore.duplicateProject(id);
     onRefreshProjects();
+    setNotice({ type: 'success', text: 'Project duplicated.' });
+    setTimeout(() => setNotice(null), 2500);
   };
 
   const handleExportBackup = () => {
@@ -87,11 +114,12 @@ export const ProjectsManager: React.FC<ProjectsManagerProps> = ({
       reader.onload = (event) => {
         const text = event.target?.result as string;
         if (ProjectStore.importFromJson(text)) {
-          alert('Projects imported successfully!');
+          setNotice({ type: 'success', text: 'Projects backup imported successfully!' });
           onRefreshProjects();
         } else {
-          alert('Invalid backup JSON file');
+          setNotice({ type: 'error', text: 'Invalid JSON backup file format.' });
         }
+        setTimeout(() => setNotice(null), 3500);
       };
       reader.readAsText(file);
     }
@@ -104,13 +132,13 @@ export const ProjectsManager: React.FC<ProjectsManagerProps> = ({
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold text-cyan-400 mb-2">
             <FolderKanban className="w-4 h-4" />
-            <span>PROJECT MANAGEMENT &amp; EXPORT LIBRARY</span>
+            <span>PROJECT MANAGEMENT &amp; EXPORT HISTORY</span>
           </div>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-            My Video Projects
+            My Video Projects &amp; Exports
           </h2>
           <p className="text-sm text-slate-300 mt-1 max-w-xl">
-            Open saved projects, customize timelines, download rendered MP4 videos, or export full JSON backups.
+            Manage saved timelines, inspect verified video exports, or back up your entire studio workspace.
           </p>
         </div>
 
@@ -118,7 +146,6 @@ export const ProjectsManager: React.FC<ProjectsManagerProps> = ({
           <button
             onClick={handleExportBackup}
             className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-all"
-            title="Download JSON Backup"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Export Backup</span>
@@ -145,30 +172,150 @@ export const ProjectsManager: React.FC<ProjectsManagerProps> = ({
         </div>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1">
-        {[
-          { id: 'all', label: 'All Projects' },
-          { id: 'business_documentary', label: 'Business Documentaries (16:9)' },
-          { id: 'islamic_reel', label: 'Islamic Reels (9:16)' },
-          { id: 'custom_video', label: 'Custom Video Edits' },
-        ].map((tab) => (
+      {notice && (
+        <div
+          className={`p-3.5 rounded-2xl border text-xs flex items-center gap-2 ${
+            notice.type === 'success'
+              ? 'bg-emerald-950/50 border-emerald-500/40 text-emerald-300'
+              : 'bg-rose-950/50 border-rose-500/40 text-rose-300'
+          }`}
+        >
+          {notice.type === 'success' ? (
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          ) : (
+            <AlertTriangle className="w-4 h-4 text-rose-400" />
+          )}
+          <span>{notice.text}</span>
+        </div>
+      )}
+
+      {/* Workspace Toggle + Filter Tabs */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-2 p-1 rounded-xl bg-slate-900 border border-slate-800">
           <button
-            key={tab.id}
-            onClick={() => setFilterType(tab.id)}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-              filterType === tab.id
-                ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-950/40'
-                : 'bg-slate-900/60 text-slate-400 hover:text-white border border-slate-800'
+            onClick={() => setViewMode('projects')}
+            className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+              viewMode === 'projects' ? 'bg-cyan-500 text-slate-950' : 'text-slate-400 hover:text-white'
             }`}
           >
-            {tab.label}
+            <FolderKanban className="w-3.5 h-3.5" />
+            <span>Projects ({projects.length})</span>
           </button>
-        ))}
+          <button
+            onClick={() => {
+              setViewMode('exports');
+              loadExports();
+            }}
+            className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+              viewMode === 'exports' ? 'bg-purple-500 text-white' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <History className="w-3.5 h-3.5" />
+            <span>Export History ({exportHistory.length})</span>
+          </button>
+        </div>
+
+        {viewMode === 'projects' && (
+          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+            {[
+              { id: 'all', label: 'All Projects' },
+              { id: 'business_documentary', label: 'Documentaries (16:9)' },
+              { id: 'islamic_reel', label: 'Islamic Reels (9:16)' },
+              { id: 'custom_video', label: 'Custom Edits' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setFilterType(tab.id)}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                  filterType === tab.id
+                    ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-950/40'
+                    : 'bg-slate-900/60 text-slate-400 hover:text-white border border-slate-800'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Projects Grid */}
-      {filteredProjects.length === 0 ? (
+      {/* Export History View */}
+      {viewMode === 'exports' ? (
+        <div className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <History className="w-4 h-4 text-purple-400" />
+              <span>Rendered Video Export Log</span>
+            </h3>
+            <button
+              onClick={loadExports}
+              className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loadingExports ? 'animate-spin' : ''}`} />
+              <span>Refresh</span>
+            </button>
+          </div>
+
+          {exportHistory.length === 0 ? (
+            <div className="p-12 text-center text-xs text-slate-400">
+              No rendered exports logged yet. Export a video inside the Video Editor to record its verification details here.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-800 text-slate-400">
+                    <th className="pb-3 font-semibold">PROJECT / FILE</th>
+                    <th className="pb-3 font-semibold">PLATFORM PRESET</th>
+                    <th className="pb-3 font-semibold">FORMAT</th>
+                    <th className="pb-3 font-semibold">DURATION / SIZE</th>
+                    <th className="pb-3 font-semibold">AUDIO VERIFICATION</th>
+                    <th className="pb-3 font-semibold">EXPORTED</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/70">
+                  {exportHistory.map((item) => (
+                    <tr key={item.id} className="text-slate-200">
+                      <td className="py-3">
+                        <span className="font-bold text-white block">{item.projectTitle}</span>
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          {item.projectId} • {item.mimeType}
+                        </span>
+                      </td>
+                      <td className="py-3">
+                        <span className="px-2 py-0.5 rounded bg-purple-500/15 text-purple-300 font-semibold">
+                          {item.platformTarget}
+                        </span>
+                      </td>
+                      <td className="py-3 font-mono text-slate-300">
+                        {item.resolution} • {item.mimeType.split('/')[1]?.split(';')[0]?.toUpperCase() || 'VIDEO'}
+                      </td>
+                      <td className="py-3 font-mono">
+                        {item.durationSeconds.toFixed(1)}s •{' '}
+                        {(item.fileSizeBytes / (1024 * 1024)).toFixed(2)} MB
+                      </td>
+                      <td className="py-3">
+                        <span
+                          className={`px-2 py-0.5 rounded font-semibold ${
+                            item.hasVerifiedAudio
+                              ? 'bg-emerald-500/15 text-emerald-300'
+                              : 'bg-rose-500/15 text-rose-300'
+                          }`}
+                        >
+                          {item.hasVerifiedAudio ? 'Verified Audio' : 'Audio Issue'}
+                        </span>
+                      </td>
+                      <td className="py-3 text-slate-400">
+                        {new Date(item.exportedAt).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      ) : filteredProjects.length === 0 ? (
         <div className="p-16 rounded-3xl bg-slate-900/40 border border-slate-800 text-center space-y-3">
           <FolderKanban className="w-12 h-12 text-slate-600 mx-auto" />
           <h4 className="text-base font-bold text-white">No Projects Found</h4>
@@ -213,7 +360,6 @@ export const ProjectsManager: React.FC<ProjectsManagerProps> = ({
                     </div>
                   </div>
 
-                  {/* Badge Pills */}
                   <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
                     <span
                       className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${
@@ -232,7 +378,7 @@ export const ProjectsManager: React.FC<ProjectsManagerProps> = ({
                   </div>
 
                   <div className="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded bg-black/80 backdrop-blur-sm text-[10px] font-mono text-cyan-300">
-                    {duration}s
+                    {duration.toFixed(1)}s
                   </div>
                 </div>
 
@@ -279,7 +425,7 @@ export const ProjectsManager: React.FC<ProjectsManagerProps> = ({
                     <span>•</span>
                     <span className="flex items-center gap-1">
                       <Clock className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>{duration}s total</span>
+                      <span>{duration.toFixed(1)}s total</span>
                     </span>
                   </div>
 
@@ -296,6 +442,26 @@ export const ProjectsManager: React.FC<ProjectsManagerProps> = ({
                       </button>
                     </div>
                   )}
+
+                  {confirmDeleteId === project.id && (
+                    <div className="p-2.5 rounded-xl bg-rose-950/50 border border-rose-500/40 flex items-center justify-between gap-2 text-xs">
+                      <span className="text-rose-200">Delete project?</span>
+                      <div className="flex gap-1.5">
+                        <button
+                          onClick={() => handleConfirmDelete(project.id)}
+                          className="px-2 py-1 rounded bg-rose-500 text-white font-bold text-[10px]"
+                        >
+                          Confirm
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeleteId(null)}
+                          className="px-2 py-1 rounded bg-slate-800 text-slate-300 text-[10px]"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Actions Row */}
@@ -309,7 +475,7 @@ export const ProjectsManager: React.FC<ProjectsManagerProps> = ({
                       <Copy className="w-3.5 h-3.5" />
                     </button>
                     <button
-                      onClick={() => handleDelete(project.id, project.title)}
+                      onClick={() => setConfirmDeleteId(project.id)}
                       className="p-2 rounded-xl bg-slate-800 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-colors"
                       title="Delete Project"
                     >

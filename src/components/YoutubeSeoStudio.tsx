@@ -20,15 +20,17 @@ export const YoutubeSeoStudio: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [seoData, setSeoData] = useState<any | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleGenerate = async () => {
     if (!topic.trim()) return;
     setLoading(true);
+    setErrorMsg(null);
     try {
       const res = await generateSeoTools(topic, audience);
       setSeoData(res.data);
     } catch (e: any) {
-      alert(`SEO error: ${e.message}`);
+      setErrorMsg(`SEO analysis error: ${e.message}`);
     } finally {
       setLoading(false);
     }
@@ -83,6 +85,12 @@ export const YoutubeSeoStudio: React.FC = () => {
             )}
           </button>
         </div>
+
+        {errorMsg && (
+          <div className="mt-4 p-3 rounded-xl bg-rose-950/60 border border-rose-500/40 text-xs text-rose-200">
+            {errorMsg}
+          </div>
+        )}
       </div>
 
       {/* SEO Results Display */}
